@@ -34,9 +34,8 @@ export type Revenue = {
 export type LatestInvoice = {
   id: string;
   name: string;
-  image_url: string;
-  email: string;
   amount: string;
+  date: string;
 };
 
 // The database returns a number for amount, but we later format it to a string with the formatCurrency function
@@ -85,4 +84,58 @@ export type InvoiceForm = {
   customer_id: string;
   amount: number;
   status: 'pending' | 'paid';
+};
+
+// New types for your Supabase schema
+export type OINV = {
+  DocNum: string;
+  DocDate: string;
+  DueDate: string;
+  CustName: string;
+  CustAddress: string;
+  VendorName: string;
+  CustCode: string;
+  VendorCode: string;
+  VendorAddresss: string;
+  Totalb4GST: number;
+  TotalwithGST: number;
+};
+
+export type INV1 = {
+  DocNum: string;
+  No: number;
+  Description: string;
+  Quantity: number;
+  UnitPrice: number;
+  Tax: string;
+  Amount: number;
+};
+
+// Updated LatestInvoiceRaw to match your OINV schema
+export type LatestInvoiceRawSupabase = {
+  DocNum: string;
+  CustName: string;
+  DocDate: string;
+  TotalwithGST: number;
+};
+
+// Updated InvoicesTable to match your schema
+export type InvoicesTableSupabase = {
+  DocNum: string;
+  DocDate: string;
+  DueDate: string;
+  CustName: string;
+  CustAddress: string;
+  VendorName: string;
+  CustCode: string;
+  VendorCode: string;
+  TotalwithGST: number;
+  Totalb4GST: number;
+};
+
+// Customer type based on your schema
+export type CustomerSupabase = {
+  CustCode: string;
+  CustName: string;
+  CustAddress: string;
 };
