@@ -10,9 +10,10 @@ export default async function Page() {
     const {numberOfInvoices, numberOfCustomers} = await fetchCardData();
   return (
     <main>
-      <h1 className={`${inter.className} mb-4 text-xl md:text-2xl`}>
+      <h1 className={`${inter.className} text-3xl font-bold text-gray-900 mb-2`}>
         Dashboard
       </h1>
+      
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
         {/* <Card title="Collected" value={totalPaidInvoices} type="collected" />
         <Card title="Pending" value={totalPendingInvoices} type="pending" /> */}
