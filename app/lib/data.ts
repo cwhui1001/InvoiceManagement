@@ -127,10 +127,11 @@ export async function fetchCardData() {
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
+  status?: string
 ) {
   // Use Supabase if configured, otherwise fall back to postgres
   if (DATABASE_TYPE === 'supabase') {
-    return fetchFilteredInvoicesSupabase(query, currentPage);
+    return fetchFilteredInvoicesSupabase(query, currentPage, status);
   }
   
   // Original postgres implementation updated for OINV schema
@@ -150,13 +151,26 @@ export async function fetchFilteredInvoices(
         '' as image_url,
         DocDate as date,
         TotalwithGST as amount,
-        'paid' as status
+        CASE 
+          WHEN DueDate < CURRENT_DATE AND PaymentStatus IS NULL THEN 'pending'
+          WHEN PaymentStatus = 'Paid' THEN 'paid'
+          ELSE 'pending'
+        END as status
       FROM OINV
       WHERE
-        CustName ILIKE ${`%${query}%`} OR
-        DocNum ILIKE ${`%${query}%`} OR
-        CustCode ILIKE ${`%${query}%`} OR
-        VendorName ILIKE ${`%${query}%`}
+        (
+          CustName ILIKE ${`%${query}%`} OR
+          DocNum ILIKE ${`%${query}%`} OR
+          CustCode ILIKE ${`%${query}%`} OR
+          VendorName ILIKE ${`%${query}%`}
+        )
+        ${status ? sql`AND (
+          CASE 
+            WHEN DueDate < CURRENT_DATE AND PaymentStatus IS NULL THEN 'pending'
+            WHEN PaymentStatus = 'Paid' THEN 'paid'
+            ELSE 'pending'
+          END = ${status}
+        )` : sql``}
       ORDER BY DocDate DESC
       LIMIT ${ITEMS_PER_PAGE} OFFSET ${offset}
     `;

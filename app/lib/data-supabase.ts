@@ -100,6 +100,7 @@ const ITEMS_PER_PAGE = 6;
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
+  status?: string
 ) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -114,6 +115,11 @@ export async function fetchFilteredInvoices(
       queryBuilder = queryBuilder.or(
         `CustName.ilike.%${query}%,DocNum.ilike.%${query}%,VendorName.ilike.%${query}%`
       );
+    }
+
+    // Add status filter if provided
+    if (status) {
+      queryBuilder = queryBuilder.eq('PaymentStatus', status === 'paid' ? 'Paid' : null);
     }
 
     const { data: invoices, error } = await queryBuilder
@@ -131,7 +137,7 @@ export async function fetchFilteredInvoices(
       image_url: '/customers/default-avatar.png', // Default image
       date: invoice.DocDate || 'Unknown Date',
       amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
-      status: 'paid' as const, // Default status since not in schema
+      status: invoice.PaymentStatus === 'Paid' ? 'paid' : 'pending',
     }));
 
     return transformedInvoices;
