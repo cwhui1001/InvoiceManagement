@@ -246,3 +246,54 @@ export async function fetchCustomers() {
     throw new Error('Failed to fetch customers.');
   }
 }
+
+// Fetch complete invoice data for editing (header + line items)
+export async function fetchInvoiceForEdit(docNum: string) {
+  try {
+    const supabase = createAdminClient();
+    
+    // Fetch invoice header
+    const { data: invoiceHeader, error: headerError } = await supabase
+      .from('OINV')
+      .select('*')
+      .eq('DocNum', docNum)
+      .single();
+
+    if (headerError) throw headerError;
+
+    console.log('Fetched invoice header:', invoiceHeader);
+    console.log('Looking for line items with DocNum:', docNum);
+
+    // Debug: Let's see what's actually in the INV1 table
+    const { data: allLineItems, error: debugError } = await supabase
+      .from('INV1')
+      .select('*')
+      .limit(10);
+
+    if (!debugError) {
+      console.log('Sample INV1 data (first 10 rows):', allLineItems);
+    }
+
+    // Fetch invoice line items
+    const { data: lineItems, error: lineItemsError } = await supabase
+      .from('INV1')
+      .select('*')
+      .eq('DocNum', docNum)
+      .order('No', { ascending: true });
+
+    if (lineItemsError) {
+      console.error('Error fetching line items:', lineItemsError);
+      throw lineItemsError;
+    }
+
+    console.log('Fetched line items for DocNum', docNum, ':', lineItems);
+
+    return {
+      header: invoiceHeader,
+      lineItems: lineItems || []
+    };
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch invoice for editing.');
+  }
+}

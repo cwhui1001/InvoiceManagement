@@ -16,40 +16,34 @@ export default function ClientInvoiceTable({
   return (
     <div className="mt-6 flow-root">
       <div className="inline-block min-w-full align-middle">
-        <div className="rounded-lg bg-gray-50 p-2 md:pt-0">
-          <div className="md:hidden">
+        <div className="rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden">
+          {/* Mobile View */}
+          <div className="md:hidden divide-y divide-gray-200">
             {invoices?.map((invoice: InvoicesTable) => (
               <div
                 key={invoice.id}
-                className="mb-2 w-full rounded-md bg-white p-4"
+                className="p-6 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center justify-between border-b pb-4">
-                  <div>
-                    <div className="mb-2 flex items-center">
-                      <Image
-                        src={invoice.image_url}
-                        className="mr-2 rounded-full"
-                        width={28}
-                        height={28}
-                        alt={`${invoice.name}'s profile picture`}
-                      />
-                      <p>{invoice.name}</p>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    <span className="text-blue-600 font-medium">#{invoice.id}</span>
+                    <div>
+                      <p className="font-medium text-gray-900">{invoice.name}</p>
+                      <p className="text-sm text-gray-500">{formatDateToLocal(invoice.date)}</p>
                     </div>
-                    <p className="text-sm text-gray-500">{invoice.email}</p>
                   </div>
                   <InvoiceStatus status={invoice.status} />
                 </div>
-                <div className="flex w-full items-center justify-between pt-4">
+                <div className="flex w-full items-center justify-between">
                   <div>
-                    <p className="text-xl font-medium">
+                    <p className="text-2xl font-bold text-green-600">
                       {formatCurrency(invoice.amount)}
                     </p>
-                    <p>{formatDateToLocal(invoice.date)}</p>
                   </div>
                   <div className="flex justify-end gap-2">
                     <button
                       onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
-                      className="rounded-md border p-2 hover:bg-gray-100"
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors"
                       title="View PDF"
                     >
                       <DocumentIcon className="w-5 h-5" />
@@ -61,73 +55,71 @@ export default function ClientInvoiceTable({
               </div>
             ))}
           </div>
+          {/* Desktop Table */}
           <table className="hidden min-w-full text-gray-900 md:table">
-            <thead className="rounded-lg text-left text-sm font-normal">
+            <thead className="bg-gray-50">
               <tr>
-                <th scope="col" className="px-4 py-5 font-medium sm:pl-6">
-                  Customer
+                <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Invoice ID
                 </th>
-                <th scope="col" className="px-3 py-5 font-medium">
-                  Email
-                </th>
-                <th scope="col" className="px-3 py-5 font-medium">
-                  Amount
-                </th>
-                <th scope="col" className="px-3 py-5 font-medium">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
-                <th scope="col" className="px-3 py-5 font-medium">
+                <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Customer
+                </th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Amount
+                </th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th scope="col" className="px-3 py-5 font-medium text-center">
+                <th scope="col" className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   PDF
                 </th>
-                <th scope="col" className="relative py-3 pl-6 pr-3">
-                  <span className="sr-only">Actions</span>
+                <th scope="col" className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white">
+            <tbody className="bg-white divide-y divide-gray-200">
               {invoices?.map((invoice: InvoicesTable) => (
                 <tr
                   key={invoice.id}
-                  className="w-full border-b py-3 text-sm last-of-type:border-none [&:first-child>td:first-child]:rounded-tl-lg [&:first-child>td:last-child]:rounded-tr-lg [&:last-child>td:first-child]:rounded-bl-lg [&:last-child>td:last-child]:rounded-br-lg"
+                  className="hover:bg-gray-50 transition-colors"
                 >
-                  <td className="whitespace-nowrap py-3 pl-6 pr-3">
-                    <div className="flex items-center gap-3">
-                      <Image
-                        src={invoice.image_url}
-                        className="rounded-full"
-                        width={28}
-                        height={28}
-                        alt={`${invoice.name}'s profile picture`}
-                      />
-                      <p>{invoice.name}</p>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span className="text-blue-600 font-medium">#{invoice.id}</span>
                     </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {invoice.email}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">
+                      {formatDateToLocal(invoice.date)}
+                    </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {formatCurrency(invoice.amount)}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{invoice.name}</div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3">
-                    {formatDateToLocal(invoice.date)}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-bold text-green-600">
+                      {formatCurrency(invoice.amount)}
+                    </div>
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3">
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <InvoiceStatus status={invoice.status} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-3 text-center">
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
                     <button
                       onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
-                      className="rounded-md border p-2 hover:bg-gray-100"
+                      className="inline-flex items-center justify-center rounded-md border border-gray-300 p-2 text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                       title="View PDF"
                     >
-                      <DocumentIcon className="w-5 h-5" />
+                      <DocumentIcon className="h-5 w-5" />
                     </button>
                   </td>
-                  <td className="whitespace-nowrap py-3 pl-6 pr-3">
-                    <div className="flex justify-end gap-3">
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    <div className="flex justify-center gap-2">
                       <UpdateInvoice id={invoice.id} />
                       <DeleteInvoice id={invoice.id} />
                     </div>

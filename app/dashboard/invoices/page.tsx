@@ -33,16 +33,42 @@ export default async function Page({
 
   return (
     <div className="w-full">
-      <div className="flex w-full items-center justify-between">
-        <h1 className="text-2xl">Invoices</h1>
-        <UploadButton />
+      {/* Header Section */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
+            <p className="mt-2 text-sm text-gray-600">
+              Manage your invoices and track payments
+            </p>
+          </div>
+          <UploadButton />
+        </div>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-2 md:mt-8">
-        <InvoiceSearch placeholder="Search invoices..." />
-        <InvoiceStatusFilter />
+
+      {/* Search and Filter Section */}
+      <div className="mb-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <InvoiceSearch placeholder="Search invoices..." />
+            </div>
+            <div className="sm:w-48">
+              <InvoiceStatusFilter />
+            </div>
+          </div>
+        </div>
       </div>
-      <InvoicesTable invoices={invoices} />
-      <div className="mt-5 flex w-full justify-center">
+
+      {/* Table Section */}
+      <div className="mb-6">
+        <Suspense fallback={<InvoicesTableSkeleton />}>
+          <InvoicesTable invoices={invoices} />
+        </Suspense>
+      </div>
+
+      {/* Pagination Section */}
+      <div className="flex justify-center">
         <Pagination totalPages={totalPages} />
       </div>
     </div>
