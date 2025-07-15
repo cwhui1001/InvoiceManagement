@@ -1,12 +1,15 @@
 import { Suspense } from 'react';
 import { InvoiceSearch } from '@/app/ui/invoices/search';
-import { InvoiceStatusFilter } from '@/app/ui/invoices/status-filter';
+import { StatusFilter } from '@/app/ui/invoices/status-filter-individual';
+import { DateRangeFilter } from '@/app/ui/invoices/date-range-filter';
+import { AmountRangeFilter } from '@/app/ui/invoices/amount-range-filter';
 import InvoicesTable from '@/app/ui/invoices/table';
 import { InvoicesTableSkeleton } from '@/app/ui/skeletons';
 import { Metadata } from 'next';
 import { fetchFilteredInvoices, fetchInvoicesPages } from '@/app/lib/data';
 import Pagination from '@/app/ui/invoices/pagination';
 import UploadButton from '@/app/ui/invoices/upload-button';
+import RefreshButton from '@/app/ui/invoices/refresh-button';
 
 export const metadata: Metadata = {
   title: 'Invoices',
@@ -18,16 +21,24 @@ export default async function Page({
   searchParams?: Promise<{
     query?: string;
     status?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    amountMin?: string;
+    amountMax?: string;
     page?: string;
   }>;
 }) {
   const params = await searchParams;
   const query = params?.query || '';
   const status = params?.status || '';
+  const dateFrom = params?.dateFrom || '';
+  const dateTo = params?.dateTo || '';
+  const amountMin = params?.amountMin || '';
+  const amountMax = params?.amountMax || '';
   const currentPage = Number(params?.page) || 1;
 
   const [invoices, totalPages] = await Promise.all([
-    fetchFilteredInvoices(query, currentPage, status),
+    fetchFilteredInvoices(query, currentPage, status, dateFrom, dateTo, amountMin, amountMax),
     fetchInvoicesPages(query),
   ]);
 
@@ -42,19 +53,24 @@ export default async function Page({
               Manage your invoices and track payments
             </p>
           </div>
-          <UploadButton />
+          <div className="flex items-center gap-3">
+            <RefreshButton />
+            <UploadButton />
+          </div>
         </div>
       </div>
 
       {/* Search and Filter Section */}
       <div className="mb-6">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-col lg:flex-row gap-4">
+            <div className="flex-1 min-w-0">
               <InvoiceSearch placeholder="Search invoices..." />
             </div>
-            <div className="sm:w-48">
-              <InvoiceStatusFilter />
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+              <StatusFilter />
+              <DateRangeFilter />
+              <AmountRangeFilter />
             </div>
           </div>
         </div>

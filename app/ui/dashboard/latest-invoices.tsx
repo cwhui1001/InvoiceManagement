@@ -3,6 +3,7 @@ import clsx from 'clsx';
 import Image from 'next/image';
 import { inter } from '@/app/ui/fonts';
 import { LatestInvoice } from '@/app/lib/definitions';
+import { formatDateFromObject } from '@/app/lib/utils';
 export default async function LatestInvoices({
   latestInvoices,
 }: {
@@ -55,7 +56,7 @@ export default async function LatestInvoices({
                     </span>
                   </div>
                   <span className="text-sm text-gray-600">
-                    {invoice.date}
+                    {formatDateFromObject(invoice.date)}
                   </span>
                   <span className="text-sm text-gray-800 truncate col-span-2">
                     {invoice.name || 'Unknown Customer'}
@@ -86,7 +87,7 @@ export default async function LatestInvoices({
                           #{invoice.id}
                         </p>
                         <p className="text-xs text-gray-500">
-                          {invoice.date}
+                          {formatDateFromObject(invoice.date)}
                         </p>
                       </div>
                     </div>

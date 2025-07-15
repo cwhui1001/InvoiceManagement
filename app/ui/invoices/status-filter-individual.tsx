@@ -9,7 +9,7 @@ import clsx from 'clsx';
 const statuses = [
 	{
 		value: '',
-		label: 'All',
+		label: 'All Status',
 	},
 	{
 		value: 'paid',
@@ -21,7 +21,7 @@ const statuses = [
 	},
 ];
 
-export function InvoiceStatusFilter() {
+export function StatusFilter() {
 	const searchParams = useSearchParams();
 	const pathname = usePathname();
 	const { replace } = useRouter();
@@ -38,17 +38,22 @@ export function InvoiceStatusFilter() {
 		replace(`${pathname}?${params.toString()}`);
 	}
 
+	const currentStatusLabel = statuses.find(s => s.value === currentStatus)?.label || 'All Status';
+
 	return (
 		<Popover.Root>
-			<Popover.Trigger asChild>
-				<div className="flex h-10 items-center rounded-lg bg-white px-4 text-sm font-medium text-gray-700 border border-gray-200 hover:bg-gray-50 focus:outline-none cursor-pointer">
-					<span>Status</span>
-					<ChevronUpDownIcon className="ml-2 h-5 w-5" />
-				</div>
+			<Popover.Trigger className={clsx(
+				"flex h-10 items-center rounded-lg px-4 text-sm font-medium border transition-colors min-w-[120px] justify-between",
+				currentStatus 
+					? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+					: "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+			)}>
+				<span className="truncate">{currentStatusLabel}</span>
+				<ChevronUpDownIcon className="ml-2 h-4 w-4 flex-shrink-0" />
 			</Popover.Trigger>
 			<Popover.Portal>
 				<Popover.Content
-					className="bg-white rounded-lg shadow-lg mt-1 p-2 w-48"
+					className="bg-white rounded-lg shadow-lg mt-1 p-2 w-48 border border-gray-200 z-50"
 					sideOffset={5}
 				>
 					<div className="flex flex-col">
@@ -57,15 +62,15 @@ export function InvoiceStatusFilter() {
 								key={status.value}
 								className={clsx(
 									'flex items-center px-4 py-2 text-sm rounded-md hover:bg-gray-100',
-									status.value === currentStatus && 'bg-gray-100'
+									status.value === currentStatus && 'bg-blue-50 text-blue-700'
 								)}
 								onClick={() => {
 									handleStatusChange(status.value);
 								}}
 							>
-								<span className="flex-grow">{status.label}</span>
+								<span className="flex-grow text-left">{status.label}</span>
 								{status.value === currentStatus && (
-									<CheckIcon className="h-4 w-4" />
+									<CheckIcon className="h-4 w-4 text-blue-600" />
 								)}
 							</button>
 						))}

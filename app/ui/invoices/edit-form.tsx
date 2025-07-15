@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/app/ui/button';
 import { CustomerField, OINV, INV1 } from '@/app/lib/definitions';
 import { updateInvoice } from '../../lib/actions';
+import { convertDateToInputFormat, convertDateFromInputFormat, formatDateFromObject } from '@/app/lib/utils';
 
 interface EditInvoiceFormProps {
   invoiceData: {
@@ -25,6 +26,7 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
       {
         DocNum: invoiceData.header.DocNum,
         No: 1,
+        ItemCode: '',
         Description: '',
         Quantity: 1,
         UnitPrice: 0,
@@ -34,7 +36,7 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
     ]
   });
 
-  const handleHeaderChange = (field: keyof OINV, value: string | number) => {
+  const handleHeaderChange = (field: keyof OINV, value: string | number | Date) => {
     setFormData(prev => ({
       ...prev,
       header: {
@@ -71,6 +73,7 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
     const newLineItem: INV1 = {
       DocNum: formData.header.DocNum,
       No: formData.lineItems.length + 1,
+      ItemCode: '',
       Description: '',
       Quantity: 1,
       UnitPrice: 0,
@@ -188,8 +191,8 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
               id="docDate"
               name="docDate"
               type="date"
-              value={formData.header.DocDate || ''}
-              onChange={(e) => handleHeaderChange('DocDate', e.target.value)}
+              value={convertDateToInputFormat(formData.header.DocDate)}
+              onChange={(e) => handleHeaderChange('DocDate', convertDateFromInputFormat(e.target.value) || new Date())}
               className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -203,8 +206,23 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
               id="dueDate"
               name="dueDate"
               type="date"
-              value={formData.header.DueDate || ''}
-              onChange={(e) => handleHeaderChange('DueDate', e.target.value)}
+              value={convertDateToInputFormat(formData.header.DueDate)}
+              onChange={(e) => handleHeaderChange('DueDate', convertDateFromInputFormat(e.target.value) || new Date())}
+              className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+
+          {/* Delivery Date */}
+          <div>
+            <label htmlFor="deliveryDate" className="block text-sm font-medium text-gray-700 mb-2">
+              Delivery Date
+            </label>
+            <input
+              id="deliveryDate"
+              name="deliveryDate"
+              type="date"
+              value={convertDateToInputFormat(formData.header.DeliveryDate || null)}
+              onChange={(e) => handleHeaderChange('DeliveryDate', convertDateFromInputFormat(e.target.value) || new Date())}
               className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
@@ -302,7 +320,20 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Item Code
+                  </label>
+                  <input
+                    type="text"
+                    value={item.ItemCode || ''}
+                    onChange={(e) => handleLineItemChange(index, 'ItemCode', e.target.value)}
+                    className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    placeholder="Enter item code..."
+                  />
+                </div>
+
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Description

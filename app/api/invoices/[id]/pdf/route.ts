@@ -11,7 +11,28 @@ export async function GET(
 
     console.log('Looking for PDF for invoice ID:', invoiceId);
 
-    // First, try to find if there's a PDF file stored for this invoice in Supabase storage
+    // First check if the invoice exists and has a direct PDF URL
+    const { data: invoice, error: invoiceError } = await supabase
+      .from('OINV')
+      .select('DocNum, CustName, TotalwithGST, DocDate, Status, pdf_url, pdf_filename')
+      .eq('DocNum', invoiceId)
+      .single();
+
+    if (invoiceError || !invoice) {
+      console.error('Invoice not found:', invoiceError);
+      return NextResponse.json(
+        { error: 'Invoice not found.' },
+        { status: 404 }
+      );
+    }
+
+    // If invoice has a direct PDF URL, redirect to it
+    if (invoice.pdf_url) {
+      console.log('Found direct PDF URL:', invoice.pdf_url);
+      return NextResponse.redirect(invoice.pdf_url);
+    }
+
+    // If no direct PDF URL, try to find PDF file in storage
     const { data: files, error: listError } = await supabase
       .storage
       .from('invoices')
@@ -41,37 +62,16 @@ export async function GET(
       return NextResponse.redirect(publicUrl);
     }
 
-    // If no specific PDF found, check if the invoice exists in the database
-    const { data: invoice, error: invoiceError } = await supabase
-      .from('invoices')
-      .select(`
-        *,
-        customers (
-          name,
-          email
-        )
-      `)
-      .eq('id', invoiceId)
-      .single();
-
-    if (invoiceError || !invoice) {
-      console.error('Invoice not found:', invoiceError);
-      return NextResponse.json(
-        { error: 'Invoice not found.' },
-        { status: 404 }
-      );
-    }
-
     // If invoice exists but no PDF found, return a helpful message
     return NextResponse.json({
       error: 'No PDF available for this invoice',
       message: 'This invoice does not have an associated PDF file. You can upload one using the bulk upload feature.',
       invoice: {
-        id: invoice.id,
-        customer: invoice.customers?.name || 'Unknown',
-        amount: invoice.amount,
-        date: invoice.date,
-        status: invoice.status
+        id: invoice.DocNum,
+        customer: invoice.CustName || 'Unknown',
+        amount: invoice.TotalwithGST,
+        date: invoice.DocDate,
+        status: invoice.Status
       }
     }, { status: 404 });
 

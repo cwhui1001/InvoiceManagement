@@ -127,11 +127,15 @@ export async function fetchCardData() {
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
-  status?: string
+  status?: string,
+  dateFrom?: string,
+  dateTo?: string,
+  amountMin?: string,
+  amountMax?: string
 ) {
   // Use Supabase if configured, otherwise fall back to postgres
   if (DATABASE_TYPE === 'supabase') {
-    return fetchFilteredInvoicesSupabase(query, currentPage, status);
+    return fetchFilteredInvoicesSupabase(query, currentPage, status, dateFrom, dateTo, amountMin, amountMax);
   }
   
   // Original postgres implementation updated for OINV schema

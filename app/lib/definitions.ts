@@ -20,7 +20,7 @@ export type Invoice = {
   id: string;
   customer_id: string;
   amount: number;
-  date: string;
+  date: Date;
   // In TypeScript, this is called a string union type.
   // It means that the "status" property can only be one of the two strings: 'pending' or 'paid'.
   status: 'pending' | 'paid';
@@ -35,7 +35,7 @@ export type LatestInvoice = {
   id: string;
   name: string;
   amount: string;
-  date: string;
+  date: Date;
 };
 
 // The database returns a number for amount, but we later format it to a string with the formatCurrency function
@@ -49,9 +49,11 @@ export type InvoicesTable = {
   name: string;
   email: string;
   image_url: string;
-  date: string;
+  date: Date;
   amount: number;
   status: 'pending' | 'paid';
+  pdf_url?: string | null;
+  delivery_date?: Date | null;
 };
 
 export type CustomersTableType = {
@@ -89,8 +91,9 @@ export type InvoiceForm = {
 // New types for your Supabase schema
 export type OINV = {
   DocNum: string;
-  DocDate: string;
-  DueDate: string;
+  DocDate: Date;
+  DueDate: Date;
+  DeliveryDate?: Date | null;
   CustName: string;
   CustAddress: string;
   VendorName: string;
@@ -99,11 +102,15 @@ export type OINV = {
   VendorAddresss: string;
   Totalb4GST: number;
   TotalwithGST: number;
+  Status?: string | null;
+  pdf_url?: string | null;
+  pdf_filename?: string | null;
 };
 
 export type INV1 = {
   DocNum: string;
   No: number;
+  ItemCode: string;
   Description: string;
   Quantity: number;
   UnitPrice: number;
@@ -115,15 +122,15 @@ export type INV1 = {
 export type LatestInvoiceRawSupabase = {
   DocNum: string;
   CustName: string;
-  DocDate: string;
+  DocDate: Date;
   TotalwithGST: number;
 };
 
 // Updated InvoicesTable to match your schema
 export type InvoicesTableSupabase = {
   DocNum: string;
-  DocDate: string;
-  DueDate: string;
+  DocDate: Date;
+  DueDate: Date;
   CustName: string;
   CustAddress: string;
   VendorName: string;

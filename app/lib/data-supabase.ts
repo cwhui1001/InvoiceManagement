@@ -13,7 +13,7 @@ import {
   InvoicesTableSupabase,
   CustomerSupabase,
 } from './definitions';
-import { formatCurrency } from './utils';
+import { formatCurrency, convertFromDateInputFormat, parseStringToDate, formatDateFromObject } from './utils';
 
 // Fetch latest invoices from OINV table
 export async function fetchLatestInvoices() {
@@ -31,7 +31,7 @@ export async function fetchLatestInvoices() {
       id: invoice.DocNum,
       name: invoice.CustName || 'Unknown Customer',
       amount: formatCurrency(invoice.TotalwithGST || 0),
-      date: invoice.DocDate || 'Unknown Date',
+      date: parseStringToDate(invoice.DocDate) || new Date(),
     }));
     
     return latestInvoices;
@@ -100,7 +100,11 @@ const ITEMS_PER_PAGE = 6;
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
-  status?: string
+  status?: string,
+  dateFrom?: string,
+  dateTo?: string,
+  amountMin?: string,
+  amountMax?: string
 ) {
   const offset = (currentPage - 1) * ITEMS_PER_PAGE;
 
@@ -119,28 +123,89 @@ export async function fetchFilteredInvoices(
 
     // Add status filter if provided
     if (status) {
-      queryBuilder = queryBuilder.eq('PaymentStatus', status === 'paid' ? 'Paid' : null);
+      queryBuilder = queryBuilder.eq('Status', status === 'paid' ? 'Done' : 'Pending');
     }
 
+    // Add amount range filter if provided - moved to JavaScript filtering
+    // if (amountMin) {
+    //   queryBuilder = queryBuilder.gte('TotalwithGST', parseFloat(amountMin));
+    // }
+    // if (amountMax) {
+    //   queryBuilder = queryBuilder.lte('TotalwithGST', parseFloat(amountMax));
+    // }
+
+    // Fetch all records first (we'll apply date and amount filtering in JavaScript)
     const { data: invoices, error } = await queryBuilder
-      .order('DocDate', { ascending: false })
-      .range(offset, offset + ITEMS_PER_PAGE - 1);
+      .order('DocDate', { ascending: false });
 
     if (error) throw error;
 
     // Transform data to match expected format for the UI
-    const transformedInvoices = invoices.map((invoice: any) => ({
-      id: invoice.DocNum,
-      customer_id: invoice.CustCode || invoice.DocNum, // Use DocNum as fallback
-      name: invoice.CustName || 'Unknown Customer',
-      email: '', // Not available in OINV schema
-      image_url: '/customers/default-avatar.png', // Default image
-      date: invoice.DocDate || 'Unknown Date',
-      amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
-      status: invoice.PaymentStatus === 'Paid' ? 'paid' : 'pending',
-    }));
+    let transformedInvoices = invoices.map((invoice: any) => {
+      return {
+        id: invoice.DocNum,
+        customer_id: invoice.CustCode || invoice.DocNum, // Use DocNum as fallback
+        name: invoice.CustName || 'Unknown Customer',
+        email: '', // Not available in OINV schema
+        image_url: '/customers/default-avatar.png', // Default image
+        date: parseStringToDate(invoice.DocDate) || new Date(),
+        amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
+        status: invoice.Status === 'Done' ? 'paid' : 'pending',
+        pdf_url: invoice.pdf_url || null,
+        delivery_date: invoice.DeliveryDate ? parseStringToDate(invoice.DeliveryDate) : null,
+      };
+    });
 
-    return transformedInvoices;
+    // Apply date filtering in JavaScript
+    if (dateFrom || dateTo) {
+      transformedInvoices = transformedInvoices.filter(invoice => {
+        const invoiceDate = invoice.date;
+        if (!invoiceDate) return false;
+        
+        let passesDateFilter = true;
+        
+        if (dateFrom) {
+          const fromDate = new Date(dateFrom);
+          passesDateFilter = passesDateFilter && invoiceDate >= fromDate;
+        }
+        
+        if (dateTo) {
+          const toDate = new Date(dateTo);
+          // Set to end of day for toDate
+          toDate.setHours(23, 59, 59, 999);
+          passesDateFilter = passesDateFilter && invoiceDate <= toDate;
+        }
+        
+        return passesDateFilter;
+      });
+    }
+
+    // Apply amount filtering in JavaScript
+    if (amountMin || amountMax) {
+      transformedInvoices = transformedInvoices.filter(invoice => {
+        const invoiceAmount = Number(invoice.amount);
+        if (isNaN(invoiceAmount)) return false;
+        
+        let passesAmountFilter = true;
+        
+        if (amountMin) {
+          const minAmount = parseFloat(amountMin);
+          passesAmountFilter = passesAmountFilter && invoiceAmount >= minAmount;
+        }
+        
+        if (amountMax) {
+          const maxAmount = parseFloat(amountMax);
+          passesAmountFilter = passesAmountFilter && invoiceAmount <= maxAmount;
+        }
+        
+        return passesAmountFilter;
+      });
+    }
+
+    // Apply pagination after filtering
+    const paginatedInvoices = transformedInvoices.slice(offset, offset + ITEMS_PER_PAGE);
+
+    return paginatedInvoices;
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch invoices.');
@@ -164,7 +229,7 @@ export async function fetchInvoiceById(docNum: string) {
       customer_id: data.CustCode,
       amount: data.TotalwithGST,
       status: 'paid' as const, // Default status since not in schema
-      date: data.DocDate,
+      date: parseStringToDate(data.DocDate) || new Date(),
       customerName: data.CustName,
       customerAddress: data.CustAddress,
       vendorName: data.VendorName,
@@ -289,7 +354,12 @@ export async function fetchInvoiceForEdit(docNum: string) {
     console.log('Fetched line items for DocNum', docNum, ':', lineItems);
 
     return {
-      header: invoiceHeader,
+      header: {
+        ...invoiceHeader,
+        DocDate: parseStringToDate(invoiceHeader.DocDate) || new Date(),
+        DueDate: parseStringToDate(invoiceHeader.DueDate) || new Date(),
+        DeliveryDate: invoiceHeader.DeliveryDate ? parseStringToDate(invoiceHeader.DeliveryDate) : null,
+      },
       lineItems: lineItems || []
     };
   } catch (error) {
