@@ -10,6 +10,8 @@ import { fetchFilteredInvoices, fetchInvoicesPages } from '@/app/lib/data';
 import Pagination from '@/app/ui/invoices/pagination';
 import UploadButton from '@/app/ui/invoices/upload-button';
 import RefreshButton from '@/app/ui/invoices/refresh-button';
+import PdfList from '@/app/ui/invoices/pdf-list';
+import PdfManagement from '@/app/ui/admin/pdf-management';
 
 export const metadata: Metadata = {
   title: 'Invoices',
@@ -81,6 +83,16 @@ export default async function Page({
         <Suspense fallback={<InvoicesTableSkeleton />}>
           <InvoicesTable invoices={invoices} />
         </Suspense>
+      </div>
+
+      {/* PDF Files Section */}
+      <div className="mb-6">
+        <PdfList />
+      </div>
+
+      {/* PDF Management Section */}
+      <div className="mb-6">
+        <PdfManagement />
       </div>
 
       {/* Pagination Section */}

@@ -25,6 +25,41 @@ export default function ClientInvoiceTable({
   const [refreshKey, setRefreshKey] = useState(0);
   const itemsPerPage = 10;
 
+  // Handle PDF viewing
+  const handlePdfView = async (invoiceId: string) => {
+    try {
+      const response = await fetch(`/api/invoices/${invoiceId}/pdf`);
+      const contentType = response.headers.get('content-type');
+      
+      if (contentType && contentType.includes('application/json')) {
+        // Handle multiple PDFs case
+        const data = await response.json();
+        if (data.multiple) {
+          // Show modal or dropdown with multiple PDF options
+          const fileList = data.files.map((file: any) => 
+            `${file.filename} (${new Date(file.created_at).toLocaleDateString()})`
+          ).join('\n');
+          
+          const choice = confirm(
+            `Multiple PDFs found for invoice ${invoiceId}:\n\n${fileList}\n\nClick OK to view the most recent PDF.`
+          );
+          
+          if (choice && data.files.length > 0) {
+            window.open(data.files[0].url, '_blank');
+          }
+        } else if (data.error) {
+          alert(data.error);
+        }
+      } else {
+        // Single PDF case - the response is already the PDF
+        window.open(`/api/invoices/${invoiceId}/pdf`, '_blank');
+      }
+    } catch (error) {
+      console.error('Error accessing PDF:', error);
+      alert('Error accessing PDF file. Please try again.');
+    }
+  };
+
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -160,7 +195,7 @@ export default function ClientInvoiceTable({
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
                     <button
-                      onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
+                      onClick={() => handlePdfView(invoice.id)}
                       className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                     >
                       #{invoice.id}
@@ -226,7 +261,7 @@ export default function ClientInvoiceTable({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <button
-                          onClick={() => window.open(`/api/invoices/${invoice.id}/pdf`, '_blank')}
+                          onClick={() => handlePdfView(invoice.id)}
                           className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
                           #{invoice.id}

@@ -48,10 +48,10 @@ export default function BulkUploadDialog({
     try {
       const formData = new FormData();
       selectedFiles.forEach(file => {
-        formData.append('files', file);
+        formData.append('file', file); // Changed from 'files' to 'file' to match the API
       });
 
-      const response = await fetch('/api/upload', {
+      const response = await fetch('/api/invoices/bulk-upload', {
         method: 'POST',
         body: formData,
       });
@@ -62,7 +62,19 @@ export default function BulkUploadDialog({
         throw new Error(result.error || 'Failed to upload files.');
       }
 
-      setSuccess(result.message);
+      // Handle the new response format with detailed results
+      if (result.results) {
+        const failures = result.results.filter((r: any) => !r.success);
+        if (failures.length > 0) {
+          console.error('Some files failed to upload:', failures);
+          setError(`${result.successCount} files uploaded successfully, ${failures.length} failed. Check console for details.`);
+        } else {
+          setSuccess(result.message);
+        }
+      } else {
+        setSuccess(result.message);
+      }
+
       setShowConfirmation(false);
       
       // Auto-close after 2 seconds on success
