@@ -34,6 +34,7 @@ export async function POST(
         contentType: file.type,
         upsert: true,
       });
+console.error('Storage Error:', storageData);
 
     if (storageError) {
       console.error('Storage Error:', storageError);

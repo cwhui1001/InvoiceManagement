@@ -4,7 +4,8 @@ import { createAdminClient } from '@/utils/supabase/server';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const invoiceId = searchParams.get('invoiceId');
+    const docNum = searchParams.get('docNum');
+    const invoiceUuid = searchParams.get('invoiceUuid');
     
     const supabase = await createAdminClient();
     
@@ -13,15 +14,27 @@ export async function GET(request: Request) {
       .select(`
         id,
         created_at,
-        InvoiceID,
         pdf_url,
-        pdf_filename
+        pdf_filename,
+        pdf_uuid,
+        oinv_uuid,
+        OINV(
+          uuid,
+          DocNum,
+          CustName,
+          Status
+        )
       `)
       .order('created_at', { ascending: false });
 
-    // If invoiceId is provided, filter by it
-    if (invoiceId) {
-      query = query.eq('InvoiceID', invoiceId);
+    // If docNum is provided, filter by it
+    if (docNum) {
+      query = query.eq('OINV.DocNum', docNum);
+    }
+
+    // If invoiceUuid is provided, filter by it
+    if (invoiceUuid) {
+      query = query.eq('oinv_uuid', invoiceUuid);
     }
 
     const { data: pdfs, error } = await query;
@@ -34,9 +47,15 @@ export async function GET(request: Request) {
       );
     }
 
+    // Transform the data to include invoice_docnum for easier frontend handling
+    const transformedPdfs = pdfs?.map(pdf => ({
+      ...pdf,
+      invoice_docnum: Array.isArray(pdf.OINV) ? (pdf.OINV[0] as any)?.DocNum || null : (pdf.OINV as any)?.DocNum || null
+    })) || [];
+
     return NextResponse.json({
-      pdfs: pdfs || [],
-      total: pdfs?.length || 0
+      pdfs: transformedPdfs,
+      total: transformedPdfs.length
     });
 
   } catch (error) {

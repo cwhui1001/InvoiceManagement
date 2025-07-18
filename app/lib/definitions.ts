@@ -44,7 +44,7 @@ export type LatestInvoiceRaw = Omit<LatestInvoice, 'amount'> & {
 };
 
 export type InvoicesTable = {
-  id: string;
+  id: string; // UUID for unique React keys
   customer_id: string;
   name: string;
   email: string;
@@ -54,6 +54,7 @@ export type InvoicesTable = {
   status: 'pending' | 'paid';
   pdf_url?: string | null;
   delivery_date?: Date | null;
+  docNum?: string; // DocNum for display purposes
 };
 
 export type CustomersTableType = {

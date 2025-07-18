@@ -198,7 +198,7 @@ export default function ClientInvoiceTable({
                       onClick={() => handlePdfView(invoice.id)}
                       className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                     >
-                      #{invoice.id}
+                      #{invoice.docNum || invoice.id}
                     </button>
                     <div>
                       <p className="font-medium text-gray-900">{invoice.name}</p>
@@ -264,7 +264,7 @@ export default function ClientInvoiceTable({
                           onClick={() => handlePdfView(invoice.id)}
                           className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                         >
-                          #{invoice.id}
+                          #{invoice.docNum || invoice.id}
                         </button>
                       </div>
                     </td>

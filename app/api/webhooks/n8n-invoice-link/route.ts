@@ -3,28 +3,91 @@ import { createAdminClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
   try {
-    const { pdfRecordId, invoiceId, invoiceData, ocrData } = await request.json();
+    const body = await request.json();
+    const { pdfUuid, pdfId, docNum, invoiceData, ocrData, filename, originalName } = body;
 
-    console.log('Received n8n webhook request:', { pdfRecordId, invoiceId, invoiceData, ocrData });
+    console.log('=== N8N WEBHOOK RECEIVED ===');
+    console.log('Full request body:', JSON.stringify(body, null, 2));
+    console.log('Extracted fields:', { pdfUuid, pdfId, docNum, invoiceData, ocrData, filename, originalName });
+    console.log('==========================');
 
-    if (!pdfRecordId) {
+    if (!pdfUuid && !pdfId) {
       return NextResponse.json(
-        { error: 'PDF record ID is required.' },
+        { error: 'PDF UUID or ID is required.' },
         { status: 400 }
       );
     }
 
     const supabase = await createAdminClient();
 
-    console.log('Linking PDF to invoice:', { pdfRecordId, invoiceId, invoiceData });
+    console.log('Linking PDF to invoice:', { pdfUuid, pdfId, docNum, invoiceData });
 
-    // Update the PDF record with the identified invoice ID
+    // First, create or find the invoice if docNum is provided
+    let invoiceUuid = null;
+    if (docNum) {
+      // Check if invoice exists
+      const { data: existingInvoice, error: checkError } = await supabase
+        .from('OINV')
+        .select('uuid, DocNum')
+        .eq('DocNum', docNum)
+        .single();
+
+      if (checkError && checkError.code === 'PGRST116') {
+        // Invoice doesn't exist, create it
+        const newInvoice = {
+          DocNum: docNum,
+          CustName: invoiceData?.customerName || 'Unknown Customer',
+          TotalwithGST: invoiceData?.totalAmount || 0,
+          DocDate: invoiceData?.invoiceDate || new Date().toISOString(),
+          Status: 'Pending',
+          // Add any other fields from invoiceData
+          ...(invoiceData && {
+            CustAddress: invoiceData.customerAddress,
+            VendorName: invoiceData.vendorName,
+            VendorAddresss: invoiceData.vendorAddress,
+            Totalb4GST: invoiceData.totalBeforeGST,
+            DueDate: invoiceData.dueDate,
+            DeliveryDate: invoiceData.deliveryDate
+          })
+        };
+
+        const { data: createdInvoice, error: createError } = await supabase
+          .from('OINV')
+          .insert(newInvoice)
+          .select('uuid')
+          .single();
+
+        if (createError) {
+          console.error('Error creating invoice:', createError);
+          return NextResponse.json(
+            { error: 'Failed to create invoice.' },
+            { status: 500 }
+          );
+        } else {
+          console.log('Created new invoice:', createdInvoice);
+          invoiceUuid = createdInvoice.uuid;
+        }
+      } else if (!checkError) {
+        // Invoice exists, use its UUID
+        invoiceUuid = existingInvoice.uuid;
+        console.log('Found existing invoice:', existingInvoice);
+      } else {
+        console.error('Error checking invoice:', checkError);
+        return NextResponse.json(
+          { error: 'Error checking invoice.' },
+          { status: 500 }
+        );
+      }
+    }
+
+    // Update the PDF record with the invoice UUID
+    const updateCondition = pdfUuid ? { pdf_uuid: pdfUuid } : { id: pdfId };
     const { data: pdfData, error: pdfError } = await supabase
       .from('pdf')
       .update({ 
-        InvoiceID: invoiceId 
+        oinv_uuid: invoiceUuid 
       })
-      .eq('id', pdfRecordId)
+      .match(updateCondition)
       .select()
       .single();
 
@@ -36,63 +99,11 @@ export async function POST(request: Request) {
       );
     }
 
-    // If we have invoice data and the invoice doesn't exist, create it
-    if (invoiceData && invoiceId) {
-      try {
-        // Check if invoice exists
-        const { data: existingInvoice, error: checkError } = await supabase
-          .from('OINV')
-          .select('DocNum')
-          .eq('DocNum', invoiceId)
-          .single();
-
-        if (checkError && checkError.code === 'PGRST116') {
-          // Invoice doesn't exist, create it
-          const newInvoice = {
-            DocNum: invoiceId,
-            CustName: invoiceData.customerName || 'Unknown Customer',
-            TotalwithGST: invoiceData.totalAmount || 0,
-            DocDate: invoiceData.invoiceDate || new Date().toISOString(),
-            Status: 'pending',
-            // Add any other fields from your OINV table structure
-            ...(ocrData && { ocr_data: ocrData }) // Store raw OCR data if provided
-          };
-
-          const { data: createdInvoice, error: createError } = await supabase
-            .from('OINV')
-            .insert(newInvoice)
-            .select()
-            .single();
-
-          if (createError) {
-            console.error('Error creating invoice:', createError);
-            // Don't fail the whole operation if invoice creation fails
-          } else {
-            console.log('Created new invoice:', createdInvoice);
-          }
-        } else if (!checkError) {
-          // Invoice exists, optionally update it with OCR data
-          if (ocrData) {
-            const { error: updateError } = await supabase
-              .from('OINV')
-              .update({ ocr_data: ocrData })
-              .eq('DocNum', invoiceId);
-
-            if (updateError) {
-              console.error('Error updating invoice with OCR data:', updateError);
-            }
-          }
-        }
-      } catch (invoiceError) {
-        console.error('Error handling invoice creation/update:', invoiceError);
-        // Continue execution even if invoice handling fails
-      }
-    }
-
     return NextResponse.json({
       message: 'PDF linked to invoice successfully',
       pdfData: pdfData,
-      invoiceId: invoiceId,
+      invoiceUuid: invoiceUuid,
+      docNum: docNum,
       success: true
     });
 

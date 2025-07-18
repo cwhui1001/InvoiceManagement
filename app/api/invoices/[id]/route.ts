@@ -135,6 +135,65 @@ export async function DELETE(
     const docNum = params.id;
     const supabase = createAdminClient();
 
+    // First, get the invoice UUID to find linked PDFs
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('OINV')
+      .select('uuid')
+      .eq('DocNum', docNum)
+      .single();
+
+    if (invoiceError) {
+      console.error('Error finding invoice:', invoiceError);
+      return NextResponse.json(
+        { error: 'Failed to find invoice' },
+        { status: 500 }
+      );
+    }
+
+    // Get all PDFs linked to this invoice
+    const { data: linkedPdfs, error: pdfError } = await supabase
+      .from('pdf')
+      .select('pdf_uuid, pdf_filename')
+      .eq('oinv_uuid', invoiceData.uuid);
+
+    if (pdfError) {
+      console.error('Error finding linked PDFs:', pdfError);
+      return NextResponse.json(
+        { error: 'Failed to find linked PDFs' },
+        { status: 500 }
+      );
+    }
+
+    // Delete PDF files from storage
+    if (linkedPdfs && linkedPdfs.length > 0) {
+      const filesToDelete = linkedPdfs.map(pdf => `bulk-uploads/${pdf.pdf_filename}`);
+      
+      const { error: storageError } = await supabase
+        .storage
+        .from('invoices')
+        .remove(filesToDelete);
+
+      if (storageError) {
+        console.warn('Warning: Failed to delete some PDF files from storage:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+    }
+
+    // Update PDF records to unlink them (set oinv_uuid to null)
+    // This prevents foreign key constraint violations
+    const { error: unlinkPdfError } = await supabase
+      .from('pdf')
+      .update({ oinv_uuid: null })
+      .eq('oinv_uuid', invoiceData.uuid);
+
+    if (unlinkPdfError) {
+      console.error('Error unlinking PDFs:', unlinkPdfError);
+      return NextResponse.json(
+        { error: 'Failed to unlink PDF files' },
+        { status: 500 }
+      );
+    }
+
     // Delete line items first (due to foreign key constraint)
     const { error: deleteLineItemsError } = await supabase
       .from('INV1')

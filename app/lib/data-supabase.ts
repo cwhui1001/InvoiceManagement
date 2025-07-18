@@ -143,11 +143,12 @@ export async function fetchFilteredInvoices(
     // Transform data to match expected format for the UI
     let transformedInvoices = invoices.map((invoice: any) => {
       return {
-        id: invoice.DocNum,
+        id: invoice.uuid, // Use unique UUID as React key
         customer_id: invoice.CustCode || invoice.DocNum, // Use DocNum as fallback
         name: invoice.CustName || 'Unknown Customer',
         email: '', // Not available in OINV schema
         image_url: '/customers/default-avatar.png', // Default image
+        docNum: invoice.DocNum, // Keep DocNum for display purposes
         date: parseStringToDate(invoice.DocDate) || new Date(),
         amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
         status: invoice.Status === 'Done' ? 'paid' : 'pending',

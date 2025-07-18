@@ -9,13 +9,13 @@ export async function GET(
     const invoiceId = params.id;
     const supabase = await createAdminClient();
 
-    console.log('Looking for PDF for invoice ID:', invoiceId);
+    console.log('Looking for PDF for invoice UUID:', invoiceId);
 
-    // Look for PDFs in the pdf table that match this invoice ID
+    // Look for PDFs in the pdf table that match this invoice UUID
     const { data: pdfFiles, error: pdfError } = await supabase
       .from('pdf')
       .select('*')
-      .eq('InvoiceID', invoiceId)
+      .eq('oinv_uuid', invoiceId)
       .order('created_at', { ascending: false });
 
     if (pdfError) {

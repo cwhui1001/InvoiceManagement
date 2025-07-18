@@ -63,11 +63,14 @@ export default function BulkUploadDialog({
       }
 
       // Handle the new response format with detailed results
-      if (result.results) {
-        const failures = result.results.filter((r: any) => !r.success);
+      if (result.detailedResults) {
+        const failures = result.failedUploads || [];
+        const successes = result.successfulUploads || [];
+        
         if (failures.length > 0) {
           console.error('Some files failed to upload:', failures);
-          setError(`${result.successCount} files uploaded successfully, ${failures.length} failed. Check console for details.`);
+          const errorMessages = failures.map((f: any) => `${f.filename}: ${f.error}`).join('\n');
+          setError(`${successes.length} files uploaded successfully, ${failures.length} failed:\n${errorMessages}`);
         } else {
           setSuccess(result.message);
         }
@@ -139,6 +142,13 @@ export default function BulkUploadDialog({
           </div>
 
           <div className="mt-4">
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>Upload Process:</strong> Files will be uploaded and processed through OCR. 
+                The system will automatically extract invoice information and link files to invoices when possible.
+              </p>
+            </div>
+            
             {!showConfirmation ? (
               // File Selection Phase
               <div className="flex justify-center rounded-lg border border-dashed border-gray-900/25 px-6 py-10">

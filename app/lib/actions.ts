@@ -26,7 +26,7 @@ export async function updateInvoice(
   }
 ) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createAdminClient();
 
     // Update the invoice header in OINV table
     const { error: headerError } = await supabase
@@ -80,15 +80,68 @@ export async function updateInvoice(
   }
 }
 
-export async function deleteInvoice(docNum: string) {
+export async function deleteInvoice(invoiceId: string) {
   try {
-    const supabase = createAdminClient();
+    console.log('Attempting to delete invoice with ID:', invoiceId);
+    const supabase = await createAdminClient();
+
+    // First, get the invoice data using UUID
+    const { data: invoiceData, error: invoiceError } = await supabase
+      .from('OINV')
+      .select('uuid, DocNum')
+      .eq('uuid', invoiceId)
+      .single();
+
+    console.log('Invoice lookup result:', { invoiceData, invoiceError });
+
+    if (invoiceError) {
+      console.error('Error finding invoice:', invoiceError);
+      throw new Error(`Failed to find invoice: ${invoiceError.message}`);
+    }
+
+    // Get all PDFs linked to this invoice
+    const { data: linkedPdfs, error: pdfError } = await supabase
+      .from('pdf')
+      .select('pdf_uuid, pdf_filename')
+      .eq('oinv_uuid', invoiceData.uuid);
+
+    if (pdfError) {
+      console.error('Error finding linked PDFs:', pdfError);
+      throw new Error('Failed to find linked PDFs');
+    }
+
+    // Delete PDF files from storage
+    if (linkedPdfs && linkedPdfs.length > 0) {
+      const filesToDelete = linkedPdfs.map(pdf => `bulk-uploads/${pdf.pdf_filename}`);
+      
+      const { error: storageError } = await supabase
+        .storage
+        .from('invoices')
+        .remove(filesToDelete);
+
+      if (storageError) {
+        console.warn('Warning: Failed to delete some PDF files from storage:', storageError);
+        // Continue with database deletion even if storage deletion fails
+      }
+    }
+
+    // Update PDF records to unlink them (set oinv_uuid to null)
+    // This prevents foreign key constraint violations
+    const { error: unlinkPdfError } = await supabase
+      .from('pdf')
+      .update({ oinv_uuid: null })
+      .eq('oinv_uuid', invoiceData.uuid);
+
+    if (unlinkPdfError) {
+      console.error('Error unlinking PDFs:', unlinkPdfError);
+      throw new Error('Failed to unlink PDF files');
+    }
 
     // Delete line items first (due to foreign key constraint)
     const { error: deleteLineItemsError } = await supabase
       .from('INV1')
       .delete()
-      .eq('DocNum', docNum);
+      .eq('DocNum', invoiceData.DocNum);
 
     if (deleteLineItemsError) {
       console.error('Error deleting line items:', deleteLineItemsError);
@@ -99,7 +152,7 @@ export async function deleteInvoice(docNum: string) {
     const { error: deleteHeaderError } = await supabase
       .from('OINV')
       .delete()
-      .eq('DocNum', docNum);
+      .eq('uuid', invoiceData.uuid);
 
     if (deleteHeaderError) {
       console.error('Error deleting invoice header:', deleteHeaderError);
@@ -114,21 +167,21 @@ export async function deleteInvoice(docNum: string) {
   }
 }
 
-export async function updateInvoiceStatus(docNum: string, newStatus: string) {
+export async function updateInvoiceStatus(invoiceId: string, newStatus: string) {
   try {
-    const supabase = createAdminClient();
+    const supabase = await createAdminClient();
 
     // Map UI status to database status
     const dbStatus = newStatus === 'paid' ? 'Done' : 'Pending';
 
-    console.log('Updating invoice status:', { docNum, newStatus, dbStatus });
+    console.log('Updating invoice status:', { invoiceId, newStatus, dbStatus });
 
     const { data, error } = await supabase
       .from('OINV')
       .update({
         Status: dbStatus,
       })
-      .eq('DocNum', docNum)
+      .eq('uuid', invoiceId)
       .select();
 
     if (error) {

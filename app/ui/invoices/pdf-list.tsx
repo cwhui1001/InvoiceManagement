@@ -6,17 +6,25 @@ import { DocumentIcon, EyeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/ou
 interface PdfFile {
   id: number;
   created_at: string;
-  InvoiceID: string | null;
+  pdf_uuid: string;
+  oinv_uuid: string | null;
   pdf_url: string;
   pdf_filename: string;
+  invoice_docnum?: string;
+  OINV?: {
+    uuid: string;
+    DocNum: string;
+    CustName: string;
+    Status: string;
+  };
 }
 
 interface PdfListProps {
-  invoiceId?: string;
+  invoiceUuid?: string;
   refreshTrigger?: number;
 }
 
-export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps) {
+export default function PdfList({ invoiceUuid, refreshTrigger = 0 }: PdfListProps) {
   const [pdfs, setPdfs] = useState<PdfFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,8 +32,8 @@ export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps)
   const fetchPdfs = async () => {
     try {
       setLoading(true);
-      const url = invoiceId 
-        ? `/api/invoices/pdfs?invoiceId=${invoiceId}`
+      const url = invoiceUuid 
+        ? `/api/invoices/pdfs?invoiceUuid=${invoiceUuid}`
         : '/api/invoices/pdfs';
       
       const response = await fetch(url);
@@ -47,7 +55,7 @@ export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps)
 
   useEffect(() => {
     fetchPdfs();
-  }, [invoiceId, refreshTrigger]);
+  }, [invoiceUuid, refreshTrigger]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -130,7 +138,7 @@ export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps)
                   File
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Invoice ID
+                  Invoice Number
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Uploaded
@@ -155,11 +163,11 @@ export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps)
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      pdf.InvoiceID 
+                      pdf.invoice_docnum 
                         ? 'bg-green-100 text-green-800' 
                         : 'bg-yellow-100 text-yellow-800'
                     }`}>
-                      {pdf.InvoiceID || 'Pending'}
+                      {pdf.invoice_docnum || 'Pending'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
