@@ -143,7 +143,7 @@ export async function fetchFilteredInvoices(
     // Transform data to match expected format for the UI
     let transformedInvoices = invoices.map((invoice: any) => {
       return {
-        id: invoice.uuid, // Use unique UUID as React key
+        id: invoice.DocNum, // Use DocNum as React key since uuid is removed
         customer_id: invoice.CustCode || invoice.DocNum, // Use DocNum as fallback
         name: invoice.CustName || 'Unknown Customer',
         email: '', // Not available in OINV schema
