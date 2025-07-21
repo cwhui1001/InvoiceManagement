@@ -36,6 +36,7 @@ export type LatestInvoice = {
   name: string;
   amount: string;
   date: Date;
+  pdf_url?: string | null;
 };
 
 // The database returns a number for amount, but we later format it to a string with the formatCurrency function
@@ -106,6 +107,7 @@ export type OINV = {
   Status?: string | null;
   pdf_url?: string | null;
   pdf_filename?: string | null;
+  created_at?: Date | string | null;
 };
 
 export type INV1 = {
@@ -125,6 +127,7 @@ export type LatestInvoiceRawSupabase = {
   CustName: string;
   DocDate: Date;
   TotalwithGST: number;
+  created_at?: Date | string | null;
 };
 
 // Updated InvoicesTable to match your schema

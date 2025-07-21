@@ -21,8 +21,8 @@ export async function fetchLatestInvoices() {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('OINV')
-      .select('DocNum, CustName, DocDate, TotalwithGST')
-      .order('DocDate', { ascending: false })
+      .select('DocNum, CustName, DocDate, TotalwithGST, created_at')
+      .order('created_at', { ascending: false }) // Sort by created_at timestamp for true upload order
       .limit(5);
 
     if (error) throw error;
@@ -45,7 +45,7 @@ export async function fetchLatestInvoices() {
 export async function fetchCardData() {
   try {
     const supabase = await createClient();
-    
+
     // Count total invoices
     const { count: invoiceCount, error: invoiceError } = await supabase
       .from('OINV')
@@ -53,23 +53,15 @@ export async function fetchCardData() {
 
     if (invoiceError) throw invoiceError;
 
-    // Count unique customers (filter out null CustCode values)
-    const { data: customerData, error: customerError } = await supabase
+    // Count pending invoices (adjust 'Status' and value as needed)
+    const { count: pendingCount, error: pendingError } = await supabase
       .from('OINV')
-      .select('CustCode, CustName')
-      .not('CustName', 'is', null);
+      .select('*', { count: 'exact', head: true })
+      .eq('Status', 'Pending'); // Change 'Pending' to match your actual status value
 
-    if (customerError) throw customerError;
+    if (pendingError) throw pendingError;
 
-    // Get unique customer count based on CustName since CustCode might be null
-    const uniqueCustomers = new Set(
-      customerData
-        .filter((item: any) => item.CustName)
-        .map((item: any) => item.CustName.trim().toLowerCase())
-    );
-    const numberOfCustomers = uniqueCustomers.size;
-
-    // Calculate totals (handle null values)
+    // Get totals
     const { data: totalsData, error: totalsError } = await supabase
       .from('OINV')
       .select('TotalwithGST, Totalb4GST');
@@ -82,18 +74,16 @@ export async function fetchCardData() {
     }, 0);
 
     return {
-      numberOfCustomers,
       numberOfInvoices: invoiceCount || 0,
-      totalRevenue: formatCurrency(totalRevenue),
-      // Add these for compatibility with existing dashboard
-      totalPaidInvoices: formatCurrency(totalRevenue),
-      totalPendingInvoices: formatCurrency(0), // Since we don't have status info
+      numberOfPendingInvoices: pendingCount || 0,
+      totalRevenue,
     };
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch card data.');
   }
 }
+
 
 // Fetch filtered invoices from OINV table
 const ITEMS_PER_PAGE = 6;

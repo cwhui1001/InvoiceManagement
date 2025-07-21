@@ -7,7 +7,7 @@ import InteractiveInvoiceStatus from '@/app/ui/invoices/interactive-status';
 import BulkActions from '@/app/ui/invoices/bulk-actions';
 import { formatDateToLocal, formatCurrency, formatDateFromObject } from '@/app/lib/utils';
 import { type InvoicesTable } from '@/app/lib/definitions';
-import { ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, DocumentIcon } from '@heroicons/react/24/outline';
 
 type SortField = 'id' | 'date' | 'name' | 'amount' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -152,7 +152,7 @@ export default function ClientInvoiceTable({
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <th 
       scope="col" 
-      className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
+      className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
       onClick={() => handleSort(field)}
     >
       <div className="flex items-center gap-2">
@@ -178,13 +178,13 @@ export default function ClientInvoiceTable({
       />
       
       <div className="inline-block min-w-full align-middle">
-        <div className="rounded-lg bg-white shadow-sm border border-gray-200 overflow-hidden">
+        <div className="rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden">
           {/* Mobile View */}
-          <div className="md:hidden divide-y divide-gray-200">
+          <div className="md:hidden divide-y divide-gray-100">
             {currentInvoices?.map((invoice: InvoicesTable) => (
               <div
                 key={invoice.id}
-                className="p-6 hover:bg-gray-50 transition-colors"
+                className="p-6 hover:bg-blue-50 transition-colors duration-200"
               >
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -196,13 +196,21 @@ export default function ClientInvoiceTable({
                     />
                     <button
                       onClick={() => handlePdfView(invoice.id)}
-                      className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                      className={`font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1 ${
+                        invoice.pdf_url 
+                          ? 'text-blue-600 hover:text-blue-800' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                      title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
                     >
                       #{invoice.docNum || invoice.id}
+                      {invoice.pdf_url && (
+                        <DocumentIcon className="h-4 w-4 text-blue-500" />
+                      )}
                     </button>
                     <div>
-                      <p className="font-medium text-gray-900">{invoice.name}</p>
-                      <p className="text-sm text-gray-500">{formatDateFromObject(invoice.date)}</p>
+                      <p className="font-semibold text-gray-900">{invoice.name}</p>
+                      <p className="text-sm text-gray-500 font-medium">{formatDateFromObject(invoice.date)}</p>
                     </div>
                   </div>
                   <InteractiveInvoiceStatus id={invoice.id} status={invoice.status} />
@@ -224,9 +232,9 @@ export default function ClientInvoiceTable({
           {/* Desktop Table */}
           <div className="overflow-x-auto">
             <table className="hidden min-w-full text-gray-900 md:table">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th scope="col" className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     <input
                       type="checkbox"
                       checked={selectedInvoices.length === currentInvoices.length && currentInvoices.length > 0}
@@ -239,16 +247,16 @@ export default function ClientInvoiceTable({
                   <SortableHeader field="name">Customer</SortableHeader>
                   <SortableHeader field="amount">Total Amount</SortableHeader>
                   <SortableHeader field="status">Status</SortableHeader>
-                  <th scope="col" className="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th scope="col" className="px-6 py-4 text-center text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {currentInvoices?.map((invoice: InvoicesTable) => (
                   <tr
                     key={invoice.id}
-                    className="hover:bg-gray-50 transition-colors"
+                    className="hover:bg-blue-50 transition-colors duration-200"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
@@ -262,19 +270,27 @@ export default function ClientInvoiceTable({
                       <div className="flex items-center">
                         <button
                           onClick={() => handlePdfView(invoice.id)}
-                          className="text-blue-600 font-medium hover:text-blue-800 hover:underline transition-colors cursor-pointer"
+                          className={`font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1 ${
+                            invoice.pdf_url 
+                              ? 'text-blue-600 hover:text-blue-800' 
+                              : 'text-gray-500 hover:text-gray-700'
+                          }`}
+                          title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
                         >
                           #{invoice.docNum || invoice.id}
+                          {invoice.pdf_url && (
+                            <DocumentIcon className="h-4 w-4 text-blue-500" />
+                          )}
                         </button>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-gray-600">
                         {formatDateFromObject(invoice.date)}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{invoice.name}</div>
+                      <div className="text-sm font-medium text-gray-800">{invoice.name}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-bold text-green-600">

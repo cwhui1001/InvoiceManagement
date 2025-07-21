@@ -83,44 +83,41 @@ export async function fetchLatestInvoices() {
 }
 
 export async function fetchCardData() {
-  // Use Supabase if configured, otherwise fall back to postgres
-  if (DATABASE_TYPE === 'supabase') {
-    return fetchCardDataSupabase();
-  }
-  
-  // Original postgres implementation updated for OINV schema
   try {
-    if (!sql) {
-      throw new Error('Postgres connection not available. Check DATABASE_TYPE and POSTGRES_URL.');
+    console.log('Starting fetchCardData');
+    
+    if (DATABASE_TYPE === 'supabase') {
+      console.log('Using Supabase');
+      return await fetchCardDataSupabase();
     }
     
-    // Count total invoices
-    const invoiceCountPromise = sql`SELECT COUNT(*) FROM OINV`;
+    if (!sql) {
+      console.error('Postgres connection not available');
+      throw new Error('Postgres connection not available');
+    }
     
-    // Count unique customers from OINV table
-    const customerCountPromise = sql`SELECT COUNT(DISTINCT CustCode) FROM OINV WHERE CustCode IS NOT NULL`;
+    console.log('Running queries...');
+    const invoiceCountPromise = sql`SELECT COUNT(*) as count FROM OINV`;
+    const pendingCountPromise = sql`SELECT COUNT(*) as count FROM OINV WHERE Status = 'Pending'`;
     
-    // Calculate total revenue
-    const revenuePromise = sql`SELECT SUM(TotalwithGST) as total FROM OINV WHERE TotalwithGST IS NOT NULL`;
-
     const data = await Promise.all([
       invoiceCountPromise,
-      customerCountPromise,
-      revenuePromise,
+      pendingCountPromise,
     ]);
-
-    const numberOfInvoices = Number(data[0][0].count ?? '0');
-    const numberOfCustomers = Number(data[1][0].count ?? '0');
-    const totalRevenue = Number(data[2][0].total ?? '0');
-
-    return {
-      numberOfCustomers,
-      numberOfInvoices,
-      totalRevenue: formatCurrency(totalRevenue),
+    
+    console.log('Query results:', data);
+    
+    const result = {
+      numberOfInvoices: Number(data[0][0].count ?? '0'),
+      numberOfPendingInvoices: Number(data[1][0].count ?? '0'),
     };
+    
+    console.log('Processed results:', result);
+    return result;
+    
   } catch (error) {
-    console.error('Database Error:', error);
-    throw new Error('Failed to fetch card data.');
+    console.error('Full error in fetchCardData:', error);
+    throw error;
   }
 }
 
