@@ -14,7 +14,8 @@ export default function InteractiveInvoiceStatus({
   status: string; 
   onStatusChange?: (newStatus: string) => void;
 }) {
-  const [currentStatus, setCurrentStatus] = useState(status);
+  // Initialize with the correct status (ensure lowercase for UI)
+  const [currentStatus, setCurrentStatus] = useState(status.toLowerCase() === 'done' ? 'done' : 'pending');
   const [isUpdating, setIsUpdating] = useState(false);
 
   const handleStatusToggle = async (e: React.MouseEvent) => {
@@ -23,7 +24,7 @@ export default function InteractiveInvoiceStatus({
     
     if (isUpdating) return;
 
-    const newStatus = currentStatus === 'pending' ? 'paid' : 'pending';
+    const newStatus = currentStatus === 'pending' ? 'done' : 'pending';
     setIsUpdating(true);
     
     try {
@@ -32,8 +33,8 @@ export default function InteractiveInvoiceStatus({
       onStatusChange?.(newStatus);
     } catch (error) {
       console.error('Error updating invoice status:', error);
-      // Revert on error
-      setCurrentStatus(currentStatus);
+      // Optionally notify user of error (e.g., toast notification)
+      alert('Failed to update invoice status. Please try again.');
     } finally {
       setIsUpdating(false);
     }
@@ -47,7 +48,7 @@ export default function InteractiveInvoiceStatus({
         'inline-flex items-center rounded-full px-3 py-1 text-xs font-medium transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50',
         {
           'bg-gray-100 text-gray-600 hover:bg-gray-200 focus:ring-gray-300': currentStatus === 'pending',
-          'bg-green-500 text-white hover:bg-green-600 focus:ring-green-300': currentStatus === 'paid',
+          'bg-green-500 text-white hover:bg-green-600 focus:ring-green-300': currentStatus === 'done',
         },
       )}
       title={`Click to mark as ${currentStatus === 'pending' ? 'done' : 'pending'}`}

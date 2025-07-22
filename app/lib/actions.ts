@@ -134,8 +134,8 @@ export async function updateInvoiceStatus(invoiceId: string, newStatus: string) 
   try {
     const supabase = await createAdminClient();
 
-    // Map UI status to database status
-    const dbStatus = newStatus === 'paid' ? 'Done' : 'Pending';
+    // Map UI status (lowercase) to database status (capitalized)
+    const dbStatus = newStatus.toLowerCase() === 'done' ? 'Done' : 'Pending';
 
     console.log('Updating invoice status:', { invoiceId, newStatus, dbStatus });
 

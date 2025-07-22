@@ -11,6 +11,21 @@ import Pagination from '@/app/ui/invoices/pagination';
 import UploadButton from '@/app/ui/invoices/upload-button';
 import RefreshButton from '@/app/ui/invoices/refresh-button';
 
+// Define the Invoice type (move to definitions.ts if not already there)
+interface Invoice {
+  id: string;
+  customer_id: string;
+  name: string;
+  email: string;
+  image_url: string;
+  docNum: string;
+  date: Date;
+  amount: string; // Formatted currency
+  status: 'done' | 'pending';
+  pdf_url: string | null;
+  delivery_date: Date | null;
+}
+
 export const metadata: Metadata = {
   title: 'Invoices',
 };
@@ -38,7 +53,7 @@ export default async function Page({
   const currentPage = Number(params?.page) || 1;
 
   const [invoices, totalPages] = await Promise.all([
-    fetchFilteredInvoices(query, currentPage, status, dateFrom, dateTo, amountMin, amountMax),
+    fetchFilteredInvoices(query, currentPage, status, dateFrom, dateTo, amountMin, amountMax) as Promise<Invoice[]>,
     fetchInvoicesPages(query),
   ]);
 
@@ -79,10 +94,18 @@ export default async function Page({
       {/* Table Section */}
       <div className="mb-6">
         <Suspense fallback={<InvoicesTableSkeleton />}>
-          <InvoicesTable invoices={invoices} />
+          <InvoicesTable
+            invoices={invoices.map((invoice) => ({
+              ...invoice,
+              amount: Number(
+                typeof invoice.amount === 'string'
+                  ? invoice.amount.replace(/[^0-9.-]+/g, '')
+                  : invoice.amount
+              ),
+            }))}
+          />
         </Suspense>
       </div>
-
 
       {/* Pagination Section */}
       <div className="flex justify-center">

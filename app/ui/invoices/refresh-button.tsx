@@ -4,7 +4,7 @@ import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
-export default function RefreshButton() {
+export default function RefreshButton({ onRefresh }: { onRefresh?: () => void }) {
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
 

@@ -8,7 +8,7 @@ import BulkActions from '@/app/ui/invoices/bulk-actions';
 import { formatDateToLocal, formatCurrency, formatDateFromObject } from '@/app/lib/utils';
 import { type InvoicesTable } from '@/app/lib/definitions';
 import { ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, DocumentIcon } from '@heroicons/react/24/outline';
-
+import { fetchLatestInvoices } from '@/app/lib/data';
 type SortField = 'id' | 'date' | 'name' | 'amount' | 'status';
 type SortDirection = 'asc' | 'desc';
 

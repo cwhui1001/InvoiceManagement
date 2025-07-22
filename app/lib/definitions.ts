@@ -16,15 +16,20 @@ export type Customer = {
   image_url: string;
 };
 
-export type Invoice = {
+// definitions.ts or at the top of page.tsx
+export interface Invoice {
   id: string;
   customer_id: string;
-  amount: number;
+  name: string;
+  email: string;
+  image_url: string;
+  docNum: string;
   date: Date;
-  // In TypeScript, this is called a string union type.
-  // It means that the "status" property can only be one of the two strings: 'pending' or 'paid'.
-  status: 'pending' | 'paid';
-};
+  amount: string; // Formatted currency
+  status: 'done' | 'pending';
+  pdf_url: string | null;
+  delivery_date: Date | null;
+}
 
 export type Revenue = {
   month: string;
@@ -32,6 +37,7 @@ export type Revenue = {
 };
 
 export type LatestInvoice = {
+  status: 'pending' | 'done';
   id: string;
   name: string;
   amount: string;
@@ -52,7 +58,7 @@ export type InvoicesTable = {
   image_url: string;
   date: Date;
   amount: number;
-  status: 'pending' | 'paid';
+  status: 'pending' | 'done';
   pdf_url?: string | null;
   delivery_date?: Date | null;
   docNum?: string; // DocNum for display purposes
@@ -87,7 +93,7 @@ export type InvoiceForm = {
   id: string;
   customer_id: string;
   amount: number;
-  status: 'pending' | 'paid';
+  status: 'pending' | 'done';
 };
 
 // New types for your Supabase schema

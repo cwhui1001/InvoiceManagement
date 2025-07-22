@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
 import clsx from 'clsx';
 import { inter } from '@/app/ui/fonts';
@@ -8,6 +9,7 @@ import { formatDateFromObject } from '@/app/lib/utils';
 import { UpdateInvoice } from '@/app/ui/invoices/buttons';
 import { DocumentIcon } from '@heroicons/react/20/solid';
 import RefreshButton from '../invoices/refresh-button';
+import InteractiveInvoiceStatus from '@/app/ui/invoices/interactive-status';
 
 export default function LatestInvoices({
   latestInvoices,
@@ -57,7 +59,7 @@ export default function LatestInvoices({
       <div className="flex grow flex-col justify-between rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden min-h-96">
         <div className="overflow-hidden">
           {/* Desktop Header Row */}
-          <div className="hidden md:grid grid-cols-6 gap-4 items-center py-4 px-6 bg-gray-50 border-b border-gray-200">
+          <div className="hidden md:grid grid-cols-7 gap-4 items-center py-4 px-6 bg-gray-50 border-b border-gray-200">
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wider">
               Invoice
             </div>
@@ -70,18 +72,20 @@ export default function LatestInvoices({
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-right">
               Amount
             </div>
+            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-center">
+              Status
+            </div>
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-right">
               Actions
             </div>
           </div>
-          
           {/* Data Rows */}
           {latestInvoices.map((invoice, i) => (
             <div key={invoice.id}>
               {/* Desktop Layout */}
               <div
                 className={clsx(
-                  'hidden md:grid grid-cols-6 gap-4 items-center py-4 px-6 hover:bg-blue-50 transition-colors duration-200',
+                  'hidden md:grid grid-cols-7 gap-4 items-center py-4 px-6 hover:bg-blue-50 transition-colors duration-200',
                   {
                     'border-t border-gray-100': i !== 0,
                   },
@@ -106,6 +110,9 @@ export default function LatestInvoices({
                 </span>
                 <span className={`${inter.className} text-sm font-bold text-green-600 text-right`}>
                   {invoice.amount}
+                </span>
+                <span className="flex justify-center">
+                  <InteractiveInvoiceStatus id={invoice.id} status={invoice.status} />
                 </span>
                 <div className="flex justify-end">
                   <UpdateInvoice id={invoice.id} />
@@ -147,10 +154,11 @@ export default function LatestInvoices({
                     <UpdateInvoice id={invoice.id} />
                   </div>
                 </div>
-                <div className="mt-2">
+                <div className="mt-2 flex items-center justify-between">
                   <p className="text-sm text-gray-800 truncate font-medium">
                     {invoice.name || 'Unknown Customer'}
                   </p>
+                  <InteractiveInvoiceStatus id={invoice.id} status={invoice.status} />
                 </div>
               </div>
             </div>

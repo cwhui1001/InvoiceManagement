@@ -1,4 +1,3 @@
-// data-supabase.ts - Supabase version using your OINV and INV1 tables
 import { createClient, createAdminClient } from '@/utils/supabase/server';
 import {
   CustomerField,
@@ -15,14 +14,17 @@ import {
 } from './definitions';
 import { formatCurrency, convertFromDateInputFormat, parseStringToDate, formatDateFromObject } from './utils';
 
+// Constants
+const ITEMS_PER_PAGE = 6;
+
 // Fetch latest invoices from OINV table
 export async function fetchLatestInvoices() {
   try {
     const supabase = await createClient();
     const { data, error } = await supabase
       .from('OINV')
-      .select('DocNum, CustName, DocDate, TotalwithGST, created_at')
-      .order('created_at', { ascending: false }) // Sort by created_at timestamp for true upload order
+      .select('DocNum, CustName, DocDate, TotalwithGST, created_at, Status')
+      .order('created_at', { ascending: false })
       .limit(5);
 
     if (error) throw error;
@@ -32,8 +34,8 @@ export async function fetchLatestInvoices() {
       name: invoice.CustName || 'Unknown Customer',
       amount: formatCurrency(invoice.TotalwithGST || 0),
       date: parseStringToDate(invoice.DocDate) || new Date(),
+      status: invoice.Status === 'Done' ? 'done' : 'pending',
     }));
-    
     return latestInvoices;
   } catch (error) {
     console.error('Database Error:', error);
@@ -53,11 +55,11 @@ export async function fetchCardData() {
 
     if (invoiceError) throw invoiceError;
 
-    // Count pending invoices (adjust 'Status' and value as needed)
+    // Count pending invoices
     const { count: pendingCount, error: pendingError } = await supabase
       .from('OINV')
       .select('*', { count: 'exact', head: true })
-      .eq('Status', 'Pending'); // Change 'Pending' to match your actual status value
+      .eq('Status', 'Pending');
 
     if (pendingError) throw pendingError;
 
@@ -84,9 +86,7 @@ export async function fetchCardData() {
   }
 }
 
-
 // Fetch filtered invoices from OINV table
-const ITEMS_PER_PAGE = 6;
 export async function fetchFilteredInvoices(
   query: string,
   currentPage: number,
@@ -113,16 +113,8 @@ export async function fetchFilteredInvoices(
 
     // Add status filter if provided
     if (status) {
-      queryBuilder = queryBuilder.eq('Status', status === 'paid' ? 'Done' : 'Pending');
+      queryBuilder = queryBuilder.eq('Status', status === 'done' ? 'Done' : 'Pending');
     }
-
-    // Add amount range filter if provided - moved to JavaScript filtering
-    // if (amountMin) {
-    //   queryBuilder = queryBuilder.gte('TotalwithGST', parseFloat(amountMin));
-    // }
-    // if (amountMax) {
-    //   queryBuilder = queryBuilder.lte('TotalwithGST', parseFloat(amountMax));
-    // }
 
     // Fetch all records first (we'll apply date and amount filtering in JavaScript)
     const { data: invoices, error } = await queryBuilder
@@ -133,15 +125,15 @@ export async function fetchFilteredInvoices(
     // Transform data to match expected format for the UI
     let transformedInvoices = invoices.map((invoice: any) => {
       return {
-        id: invoice.DocNum, // Use DocNum as React key since uuid is removed
-        customer_id: invoice.CustCode || invoice.DocNum, // Use DocNum as fallback
+        id: invoice.DocNum,
+        customer_id: invoice.CustCode || invoice.DocNum,
         name: invoice.CustName || 'Unknown Customer',
-        email: '', // Not available in OINV schema
-        image_url: '/customers/default-avatar.png', // Default image
-        docNum: invoice.DocNum, // Keep DocNum for display purposes
+        email: '',
+        image_url: '/customers/default-avatar.png',
+        docNum: invoice.DocNum,
         date: parseStringToDate(invoice.DocDate) || new Date(),
         amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
-        status: invoice.Status === 'Done' ? 'paid' : 'pending',
+        status: invoice.Status === 'Done' ? 'done' : 'pending',
         pdf_url: invoice.pdf_url || null,
         delivery_date: invoice.DeliveryDate ? parseStringToDate(invoice.DeliveryDate) : null,
       };
@@ -162,7 +154,6 @@ export async function fetchFilteredInvoices(
         
         if (dateTo) {
           const toDate = new Date(dateTo);
-          // Set to end of day for toDate
           toDate.setHours(23, 59, 59, 999);
           passesDateFilter = passesDateFilter && invoiceDate <= toDate;
         }
@@ -219,7 +210,7 @@ export async function fetchInvoiceById(docNum: string) {
       id: data.DocNum,
       customer_id: data.CustCode,
       amount: data.TotalwithGST,
-      status: 'paid' as const, // Default status since not in schema
+      status: 'paid' as const, // Default status (update if Status is available)
       date: parseStringToDate(data.DocDate) || new Date(),
       customerName: data.CustName,
       customerAddress: data.CustAddress,
@@ -303,6 +294,56 @@ export async function fetchCustomers() {
   }
 }
 
+// Fetch filtered customers from OINV table
+export async function fetchFilteredCustomers(query: string) {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('OINV')
+      .select(`
+        CustCode,
+        CustName,
+        TotalwithGST
+      `)
+      .or(`CustName.ilike.%${query}%,CustCode.ilike.%${query}%`)
+      .not('CustCode', 'is', null);
+
+    if (error) throw error;
+
+    // Aggregate data by customer
+    const customers = data.reduce((acc: any[], current: any) => {
+      const existing = acc.find(item => item.id === current.CustCode);
+      if (existing) {
+        existing.total_invoices += 1;
+        existing.total_paid = (existing.total_paid || 0) + (current.TotalwithGST || 0);
+      } else {
+        acc.push({
+          id: current.CustCode,
+          name: current.CustName,
+          email: '',
+          image_url: '',
+          total_invoices: 1,
+          total_pending: 0, // Assuming no pending count here; adjust if needed
+          total_paid: current.TotalwithGST || 0,
+        });
+      }
+      return acc;
+    }, []);
+
+    // Format currency for total_paid
+    const formattedCustomers = customers.map((customer: any) => ({
+      ...customer,
+      total_pending: formatCurrency(customer.total_pending),
+      total_paid: formatCurrency(customer.total_paid),
+    }));
+
+    return formattedCustomers;
+  } catch (error) {
+    console.error('Database Error:', error);
+    throw new Error('Failed to fetch filtered customers.');
+  }
+}
+
 // Fetch complete invoice data for editing (header + line items)
 export async function fetchInvoiceForEdit(docNum: string) {
   try {
@@ -318,17 +359,6 @@ export async function fetchInvoiceForEdit(docNum: string) {
     if (headerError) throw headerError;
 
     console.log('Fetched invoice header:', invoiceHeader);
-    console.log('Looking for line items with DocNum:', docNum);
-
-    // Debug: Let's see what's actually in the INV1 table
-    const { data: allLineItems, error: debugError } = await supabase
-      .from('INV1')
-      .select('*')
-      .limit(10);
-
-    if (!debugError) {
-      console.log('Sample INV1 data (first 10 rows):', allLineItems);
-    }
 
     // Fetch invoice line items
     const { data: lineItems, error: lineItemsError } = await supabase
