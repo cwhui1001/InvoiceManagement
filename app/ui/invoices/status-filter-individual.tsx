@@ -12,7 +12,7 @@ const statuses = [
 		label: 'All Status',
 	},
 	{
-		value: 'paid',
+		value: 'done',
 		label: 'Done',
 	},
 	{

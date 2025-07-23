@@ -113,8 +113,19 @@ export async function fetchFilteredInvoices(
 
     // Add status filter if provided
     if (status) {
-      queryBuilder = queryBuilder.eq('Status', status === 'done' ? 'Done' : 'Pending');
-    }
+  const normalizedStatus = status.toLowerCase();
+  let dbStatus: string;
+  if (normalizedStatus === 'done') dbStatus = 'Done';
+  else if (normalizedStatus === 'pending') dbStatus = 'Pending';
+  else {
+    console.warn('fetchFilteredInvoices - Unsupported status value:', status, 'defaulting to no filter');
+    dbStatus = '';
+  }
+  if (dbStatus) {
+    queryBuilder = queryBuilder.eq('Status', dbStatus);
+    console.log('fetchFilteredInvoices - Applied status filter:', dbStatus);
+  }
+}
 
     // Fetch all records first (we'll apply date and amount filtering in JavaScript)
     const { data: invoices, error } = await queryBuilder
@@ -210,7 +221,7 @@ export async function fetchInvoiceById(docNum: string) {
       id: data.DocNum,
       customer_id: data.CustCode,
       amount: data.TotalwithGST,
-      status: 'paid' as const, // Default status (update if Status is available)
+      status: 'done' as const, // Default status (update if Status is available)
       date: parseStringToDate(data.DocDate) || new Date(),
       customerName: data.CustName,
       customerAddress: data.CustAddress,

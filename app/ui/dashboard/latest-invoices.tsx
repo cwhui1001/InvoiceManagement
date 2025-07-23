@@ -72,7 +72,7 @@ export default function LatestInvoices({
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-right">
               Amount
             </div>
-            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-center">
+            <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-right">
               Status
             </div>
             <div className="text-xs font-bold text-gray-600 uppercase tracking-wider text-right">
@@ -111,7 +111,7 @@ export default function LatestInvoices({
                 <span className={`${inter.className} text-sm font-bold text-green-600 text-right`}>
                   {invoice.amount}
                 </span>
-                <span className="flex justify-center">
+                <span className="flex justify-end">
                   <InteractiveInvoiceStatus id={invoice.id} status={invoice.status} />
                 </span>
                 <div className="flex justify-end">
