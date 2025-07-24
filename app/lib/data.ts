@@ -7,6 +7,7 @@ import {
   fetchInvoiceById,
   fetchCustomers,
   fetchFilteredCustomers,
+  fetchCategoryTotals,
 } from './data-supabase';
 
 // Constants
@@ -22,6 +23,7 @@ export {
   fetchInvoiceById,
   fetchCustomers,
   fetchFilteredCustomers,
+  fetchCategoryTotals,
 };
 
 // Export updateInvoiceStatus function (assuming it's used)

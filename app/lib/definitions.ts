@@ -124,7 +124,8 @@ export type INV1 = {
   Quantity: number;
   UnitPrice: number;
   Tax: string;
-  Amount: number;
+  Category: string | null;
+  Amount: number | null;
 };
 
 // Updated LatestInvoiceRaw to match your OINV schema

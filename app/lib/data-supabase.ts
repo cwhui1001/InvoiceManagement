@@ -113,19 +113,19 @@ export async function fetchFilteredInvoices(
 
     // Add status filter if provided
     if (status) {
-  const normalizedStatus = status.toLowerCase();
-  let dbStatus: string;
-  if (normalizedStatus === 'done') dbStatus = 'Done';
-  else if (normalizedStatus === 'pending') dbStatus = 'Pending';
-  else {
-    console.warn('fetchFilteredInvoices - Unsupported status value:', status, 'defaulting to no filter');
-    dbStatus = '';
-  }
-  if (dbStatus) {
-    queryBuilder = queryBuilder.eq('Status', dbStatus);
-    console.log('fetchFilteredInvoices - Applied status filter:', dbStatus);
-  }
-}
+      const normalizedStatus = status.toLowerCase();
+      let dbStatus: string;
+      if (normalizedStatus === 'done') dbStatus = 'Done';
+      else if (normalizedStatus === 'pending') dbStatus = 'Pending';
+      else {
+        console.warn('fetchFilteredInvoices - Unsupported status value:', status, 'defaulting to no filter');
+        dbStatus = '';
+      }
+      if (dbStatus) {
+        queryBuilder = queryBuilder.eq('Status', dbStatus);
+        console.log('fetchFilteredInvoices - Applied status filter:', dbStatus);
+      }
+    }
 
     // Fetch all records first (we'll apply date and amount filtering in JavaScript)
     const { data: invoices, error } = await queryBuilder
@@ -397,5 +397,42 @@ export async function fetchInvoiceForEdit(docNum: string) {
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch invoice for editing.');
+  }
+}
+
+// ... (other imports and functions unchanged)
+
+export async function fetchCategoryTotals() {
+  console.log('Starting fetchCategoryTotals');
+  try {
+    const supabase = await createAdminClient();
+    
+    const { data, error } = await supabase
+      .from('INV1')
+      .select('Category, Amount');
+
+    if (error) throw error;
+
+    type CategoryTotal = { Category: string; TotalAmount: number };
+
+    const totals = (data ?? []).reduce<CategoryTotal[]>((acc, item) => {
+      const category = item.Category || 'Unknown';
+      const amount = item.Amount || 0;
+      console.log('Processing item:', { category, amount }); // Log each item processed
+      const existing = acc.find(i => i.Category === category);
+      if (existing) {
+        existing.TotalAmount += amount;
+      } else {
+        acc.push({ Category: category, TotalAmount: amount });
+      }
+      return acc;
+    }, []);
+
+    
+    // Fallback if no data
+    return totals.length > 0 ? totals : [{ Category: 'No Data', TotalAmount: 0 }];
+  } catch (error) {
+    console.error('Database Error in fetchCategoryTotals:', error);
+    throw new Error('Failed to fetch category totals.');
   }
 }
