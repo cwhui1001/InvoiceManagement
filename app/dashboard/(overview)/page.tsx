@@ -31,7 +31,7 @@ export default async function Page() {
       
       {/* Second row with pie chart (full width) */}
       <div className="mt-6">
-        <div className="bg-gradient-to-br from-yellow-50 to-white p-4 rounded-xl shadow-md h-[300px] sm:h-[260px]">
+        <div className="bg-gradient-to-br from-yellow-50 to-white p-4 rounded-xl shadow-md h-[450px] sm:h-[400px]">
           <CategoryPieChart categoryTotals={categoryTotals} />
         </div>
       </div>

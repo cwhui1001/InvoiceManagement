@@ -67,18 +67,18 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
             }
           },
           title: { 
-  display: true, 
-  text: 'Revenue by Category',
-  font: {
-    size: 16,
-    weight: 'bold',
-    family: 'Inter, sans-serif'
-  },
-  color: '#111827',
-  padding: {
-    bottom: 16
-  }
-},
+            display: true, 
+            text: 'Revenue by Category',
+            font: {
+              size: 16,
+              weight: 'bold',
+              family: 'Inter, sans-serif'
+            },
+            color: '#111827',
+            padding: {
+              bottom: 16
+            }
+          },
           tooltip: {
             callbacks: {
               label: (context) => {
@@ -92,7 +92,15 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
             }
           }
         },
-        cutout: '60%'
+        cutout: '60%',
+        layout: {
+          padding: {
+            top: 5,
+            bottom: 5,
+            left: 5,
+            right: 15
+          }
+        }
       }
     });
 
@@ -118,10 +126,14 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
   }
 
   return (
-  <div className="w-full h-full relative min-h-[240px] sm:min-h-[280px] md:min-h-[300px]">
-  <canvas ref={canvasRef} className="w-full h-full" />
-</div>
-
-);
-
+    <div className="w-full h-full relative p-2">
+      <div className="w-full h-full flex items-center justify-center" style={{ minHeight: '240px' }}>
+        <canvas 
+          ref={canvasRef} 
+          className="max-w-full max-h-full"
+          style={{ width: '100%', height: '100%' }}
+        />
+      </div>
+    </div>
+  );
 }
