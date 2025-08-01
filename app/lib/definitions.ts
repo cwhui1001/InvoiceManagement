@@ -62,6 +62,8 @@ export type InvoicesTable = {
   pdf_url?: string | null;
   delivery_date?: Date | null;
   docNum?: string; // DocNum for display purposes
+  uploader_username?: string; // Username of who uploaded PDF
+  has_uploaded_pdf?: boolean; // Whether this invoice has uploaded PDFs
 };
 
 export type CustomersTableType = {
@@ -114,6 +116,7 @@ export type OINV = {
   pdf_url?: string | null;
   pdf_filename?: string | null;
   created_at?: Date | string | null;
+  username?: string;
 };
 
 export type INV1 = {
@@ -156,4 +159,24 @@ export type CustomerSupabase = {
   CustCode: string;
   CustName: string;
   CustAddress: string;
+};
+
+// PDF type for uploaded files
+export type PdfFile = {
+  id: number;
+  pdf_uuid: string;
+  created_at: string;
+  oinv_uuid: string | null;
+  pdf_url: string;
+  pdf_filename: string;
+  uploaded_by?: string;
+  uploader_email?: string;
+  uploader_display?: string;
+  invoice_docnum?: string;
+  OINV?: {
+    uuid: string;
+    DocNum: string;
+    CustName: string;
+    Status: string;
+  };
 };

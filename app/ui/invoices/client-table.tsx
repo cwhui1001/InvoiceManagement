@@ -8,7 +8,7 @@ import BulkActions from '@/app/ui/invoices/bulk-actions';
 import { formatDateToLocal, formatCurrency, formatDateFromObject } from '@/app/lib/utils';
 import { type InvoicesTable } from '@/app/lib/definitions';
 import { ChevronUpIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, DocumentIcon } from '@heroicons/react/24/outline';
-import { fetchLatestInvoices } from '@/app/lib/data';
+
 type SortField = 'id' | 'date' | 'name' | 'amount' | 'status';
 type SortDirection = 'asc' | 'desc';
 
@@ -24,6 +24,13 @@ export default function ClientInvoiceTable({
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
   const itemsPerPage = 10;
+
+  // Debug logging
+  console.log('Invoices data:', invoices.map(inv => ({
+    id: inv.id,
+    has_uploaded_pdf: inv.has_uploaded_pdf,
+    uploader_username: inv.uploader_username
+  })));
 
   // Handle PDF viewing
   const handlePdfView = async (invoiceId: string) => {
@@ -208,6 +215,17 @@ export default function ClientInvoiceTable({
                         <DocumentIcon className="h-4 w-4 text-blue-500" />
                       )}
                     </button>
+                    {/* Show uploader info for debugging */}
+                    {invoice.uploader_username && (
+                      <span className="text-xs text-gray-500 mt-1 block">
+                        uploaded by {invoice.uploader_username}
+                      </span>
+                    )}
+                    {!invoice.uploader_username && invoice.has_uploaded_pdf && (
+                      <span className="text-xs text-red-500 mt-1 block">
+                        PDF uploaded (no username)
+                      </span>
+                    )}
                     <div>
                       <p className="font-semibold text-gray-900">{invoice.name}</p>
                       <p className="text-sm text-gray-500 font-medium">{formatDateFromObject(invoice.date)}</p>
@@ -267,7 +285,7 @@ export default function ClientInvoiceTable({
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
+                      <div className="flex flex-col">
                         <button
                           onClick={() => handlePdfView(invoice.id)}
                           className={`font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1 ${
@@ -282,6 +300,17 @@ export default function ClientInvoiceTable({
                             <DocumentIcon className="h-4 w-4 text-blue-500" />
                           )}
                         </button>
+                        {/* Show uploader info for debugging */}
+                        {invoice.uploader_username && (
+                          <span className="text-xs text-gray-500 mt-1 block">
+                            uploaded by {invoice.uploader_username}
+                          </span>
+                        )}
+                        {!invoice.uploader_username && invoice.has_uploaded_pdf && (
+                          <span className="text-xs text-red-500 mt-1 block">
+                            PDF uploaded (no username)
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">

@@ -1,13 +1,24 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Chart from 'chart.js/auto';
 
 interface CategoryPieChartProps {
   categoryTotals: { Category: string; TotalAmount: number }[];
 }
 
+type ChartType = 'pie' | 'doughnut' | 'bar' | 'line' | 'polarArea';
+
+const chartTypeOptions = [
+  { value: 'pie', label: 'Pie Chart', icon: '🥧' },
+  { value: 'doughnut', label: 'Doughnut', icon: '🍩' },
+  { value: 'bar', label: 'Bar Chart', icon: '📊' },
+  { value: 'line', label: 'Line Chart', icon: '📈' },
+  { value: 'polarArea', label: 'Polar Area', icon: '🎯' },
+];
+
 export default function CategoryPieChart({ categoryTotals }: CategoryPieChartProps) {
+  const [chartType, setChartType] = useState<ChartType>('pie');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const chartRef = useRef<Chart | null>(null);
 
@@ -28,27 +39,42 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
       currency: 'USD',
     });
 
-    chartRef.current = new Chart(canvasRef.current, {
-      type: 'pie',
+    const colors = [
+      'rgba(99, 102, 241, 0.7)',  // indigo
+      'rgba(59, 130, 246, 0.7)',  // blue
+      'rgba(16, 185, 129, 0.7)',  // emerald
+      'rgba(245, 158, 11, 0.7)', // amber
+      'rgba(244, 63, 94, 0.7)',   // rose
+      'rgba(139, 92, 246, 0.7)',  // violet
+      'rgba(20, 184, 166, 0.7)',  // teal
+      'rgba(249, 115, 22, 0.7)',  // orange
+      'rgba(236, 72, 153, 0.7)',  // pink
+      'rgba(6, 182, 212, 0.7)'   // cyan
+    ];
+
+    const borderColors = colors.map(color => color.replace('0.7', '1'));
+
+    const baseConfig = {
+      type: chartType as any,
       data: {
         labels: categoryTotals.map(item => item.Category),
         datasets: [{
+          label: 'Amount',
           data: categoryTotals.map(item => item.TotalAmount),
-          backgroundColor: [
-            'rgba(99, 102, 241, 0.7)',  // indigo
-            'rgba(59, 130, 246, 0.7)',  // blue
-            'rgba(16, 185, 129, 0.7)',  // emerald
-            'rgba(245, 158, 11, 0.7)', // amber
-            'rgba(244, 63, 94, 0.7)',   // rose
-            'rgba(139, 92, 246, 0.7)',  // violet
-            'rgba(20, 184, 166, 0.7)',  // teal
-            'rgba(249, 115, 22, 0.7)',  // orange
-            'rgba(236, 72, 153, 0.7)',  // pink
-            'rgba(6, 182, 212, 0.7)'   // cyan
-          ],
-          borderColor: 'rgba(255, 255, 255, 0.8)',
-          borderWidth: 1,
-          hoverOffset: 8
+          backgroundColor: chartType === 'line' ? 'rgba(99, 102, 241, 0.1)' : colors,
+          borderColor: chartType === 'line' ? 'rgba(99, 102, 241, 1)' : borderColors,
+          borderWidth: chartType === 'line' ? 2 : 1,
+          ...(chartType === 'line' && {
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: 'rgba(99, 102, 241, 1)',
+            pointBorderColor: '#fff',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+          }),
+          ...((['pie', 'doughnut', 'polarArea'].includes(chartType)) && {
+            hoverOffset: 8
+          })
         }]
       },
       options: {
@@ -56,7 +82,7 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
         maintainAspectRatio: false,
         plugins: {
           legend: { 
-            position: 'right',
+            position: (['bar', 'line'].includes(chartType) ? 'top' : 'right') as any,
             labels: {
               boxWidth: 12,
               padding: 16,
@@ -81,35 +107,55 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
           },
           tooltip: {
             callbacks: {
-              label: (context) => {
+              label: (context: any) => {
                 const label = context.label || '';
                 const value = context.raw || 0;
-                const percentage = context.dataset.data
-                  ? (Number(value) / context.dataset.data.reduce((a, b) => Number(a) + Number(b), 0) * 100).toFixed(1)
-                  : '0';
-                return `${label}: ${formatter.format(Number(value))} (${percentage}%)`;
+                if (['pie', 'doughnut', 'polarArea'].includes(chartType)) {
+                  const percentage = context.dataset.data
+                    ? (Number(value) / context.dataset.data.reduce((a: any, b: any) => Number(a) + Number(b), 0) * 100).toFixed(1)
+                    : '0';
+                  return `${label}: ${formatter.format(Number(value))} (${percentage}%)`;
+                } else {
+                  return `${label}: ${formatter.format(Number(value))}`;
+                }
               }
             }
           }
         },
-        cutout: '60%',
+        ...(chartType === 'doughnut' && {
+          cutout: '60%'
+        }),
+        ...((['bar', 'line'].includes(chartType)) && {
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: {
+                callback: function(value: any) {
+                  return formatter.format(Number(value));
+                }
+              }
+            }
+          }
+        }),
         layout: {
           padding: {
             top: 5,
             bottom: 5,
             left: 5,
-            right: 15
+            right: (['bar', 'line'].includes(chartType) ? 5 : 15)
           }
         }
       }
-    });
+    };
+
+    chartRef.current = new Chart(canvasRef.current, baseConfig);
 
     return () => {
       if (chartRef.current) {
         chartRef.current.destroy();
       }
     };
-  }, [categoryTotals]);
+  }, [categoryTotals, chartType]);
 
   if (!categoryTotals || categoryTotals.length === 0) {
     return (
@@ -127,6 +173,21 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
 
   return (
     <div className="w-full h-full relative p-2">
+      {/* Chart Type Selector */}
+      <div className="flex justify-end mb-3">
+        <select
+          value={chartType}
+          onChange={(e) => setChartType(e.target.value as ChartType)}
+          className="px-3 py-1 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
+        >
+          {chartTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.icon} {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      
       <div className="w-full h-full flex items-center justify-center" style={{ minHeight: '240px' }}>
         <canvas 
           ref={canvasRef} 

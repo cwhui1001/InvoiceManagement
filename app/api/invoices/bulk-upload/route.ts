@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAdminClient } from '@/utils/supabase/server';
+import { createAdminClient, createClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
   try {
@@ -13,7 +13,29 @@ export async function POST(request: Request) {
       );
     }
 
+    // Get current user and their profile information
+    const userClient = await createClient();
+    const { data: { user }, error: userError } = await userClient.auth.getUser();
+    
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: 'Authentication required.' },
+        { status: 401 }
+      );
+    }
+
+    // Get user's profile information for username
     const supabase = await createAdminClient();
+    const { data: userProfile, error: profileError } = await supabase
+      .from('profiles')
+      .select('username, full_name')
+      .eq('id', user.id)
+      .single();
+
+    const uploaderUsername = userProfile?.username || user.email?.split('@')[0] || 'unknown_user';
+    
+    console.log(`Upload initiated by user: ${user.id} (${uploaderUsername})`);
+
     const uploadResults = [];
     const n8nWebhook = process.env.N8N_WEBHOOK_URL;
 
@@ -59,15 +81,18 @@ console.error('Storage Error:', storageData);
           .from('invoices')
           .getPublicUrl(`bulk-uploads/${filename}`);
 
-        // 5. Create PDF record (not linked to any invoice initially)
+        // 5. Create PDF record with actual uploader information
         const { data: pdfRecord, error: dbError } = await supabase
           .from('pdf')
           .insert({
             pdf_url: publicUrl,
-            pdf_filename: filename,
-            oinv_uuid: null // No invoice link initially
+            pdf_filename: filename, // Keep original timestamp-filename format
+            oinv_uuid: null, // No invoice link initially
+            uploader_user_id: user.id, // Store actual uploader's user ID
+            uploader_username: uploaderUsername, // Store username for display
+            created_by: user.id // Audit trail
           })
-          .select('pdf_uuid, id, created_at')
+          .select('id, created_at, pdf_uuid')
           .single();
 
         if (dbError) {
@@ -78,8 +103,9 @@ console.error('Storage Error:', storageData);
         uploadResults.push({
           filename: file.name,
           success: true,
-          url: `/api/invoices/pdfs/${pdfRecord.pdf_uuid}`,
+          url: `/api/invoices/pdfs/${pdfRecord.id}`,
           storageFilename: filename,
+          pdfId: pdfRecord.id,
           pdfUuid: pdfRecord.pdf_uuid,
           invoiceNumber: null, // No invoice linked initially
           invoiceStatus: null
@@ -94,6 +120,7 @@ console.error('Storage Error:', storageData);
               type: 'invoice_upload',
               action: 'process',
               pdf: {
+                id: pdfRecord.id,
                 uuid: pdfRecord.pdf_uuid,
                 url: publicUrl,
                 originalName: file.name,

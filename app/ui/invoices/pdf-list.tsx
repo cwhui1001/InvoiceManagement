@@ -6,25 +6,20 @@ import { DocumentIcon, EyeIcon, ArrowDownTrayIcon } from '@heroicons/react/24/ou
 interface PdfFile {
   id: number;
   created_at: string;
-  pdf_uuid: string;
-  oinv_uuid: string | null;
   pdf_url: string;
   pdf_filename: string;
+  pdf_uuid: string;
+  oinv_uuid: string | null;
+  uploader_display?: string;
   invoice_docnum?: string;
-  OINV?: {
-    uuid: string;
-    DocNum: string;
-    CustName: string;
-    Status: string;
-  };
 }
 
 interface PdfListProps {
-  invoiceUuid?: string;
+  invoiceId?: string;
   refreshTrigger?: number;
 }
 
-export default function PdfList({ invoiceUuid, refreshTrigger = 0 }: PdfListProps) {
+export default function PdfList({ invoiceId, refreshTrigger = 0 }: PdfListProps) {
   const [pdfs, setPdfs] = useState<PdfFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -32,8 +27,8 @@ export default function PdfList({ invoiceUuid, refreshTrigger = 0 }: PdfListProp
   const fetchPdfs = async () => {
     try {
       setLoading(true);
-      const url = invoiceUuid 
-        ? `/api/invoices/pdfs?invoiceUuid=${invoiceUuid}`
+      const url = invoiceId 
+        ? `/api/invoices/pdfs?invoiceId=${invoiceId}`
         : '/api/invoices/pdfs';
       
       const response = await fetch(url);
@@ -55,7 +50,7 @@ export default function PdfList({ invoiceUuid, refreshTrigger = 0 }: PdfListProp
 
   useEffect(() => {
     fetchPdfs();
-  }, [invoiceUuid, refreshTrigger]);
+  }, [invoiceId, refreshTrigger]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -162,13 +157,20 @@ export default function PdfList({ invoiceUuid, refreshTrigger = 0 }: PdfListProp
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                      pdf.invoice_docnum 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {pdf.invoice_docnum || 'Pending'}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                        pdf.invoice_docnum 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {pdf.invoice_docnum || 'Pending'}
+                      </span>
+                      {pdf.uploader_display && (
+                        <span className="text-xs text-gray-500 mt-1">
+                          by {pdf.uploader_display}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {formatDate(pdf.created_at)}

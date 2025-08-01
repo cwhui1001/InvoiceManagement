@@ -23,18 +23,31 @@ export async function POST(
     // Get invoice ID from URL params
     const invoiceId = params.id;
 
-    // Create a Supabase client with admin privileges
-    const supabase = await createAdminClient();
+    // Create a Supabase client for the authenticated user
+    const supabase = createClient();
+
+    // Get the authenticated user's ID
+    const { data: { user }, error: userError } = await (await supabase).auth.getUser();
+    if (userError || !user) {
+      console.error('User Error:', userError);
+      return NextResponse.json(
+        { error: 'User not authenticated.' },
+        { status: 401 }
+      );
+    }
+    const userId = user.id;
+
+    // Create a Supabase client with admin privileges for storage operations
+    const supabaseAdmin = await createAdminClient();
 
     // Upload to Supabase storage
-    const { data: storageData, error: storageError } = await supabase
+    const { data: storageData, error: storageError } = await supabaseAdmin
       .storage
       .from('invoices')
       .upload(`${invoiceId}/${file.name}`, fileBuffer, {
         contentType: file.type,
         upsert: true,
       });
-console.error('Storage Error:', storageData);
 
     if (storageError) {
       console.error('Storage Error:', storageError);
@@ -45,17 +58,18 @@ console.error('Storage Error:', storageData);
     }
 
     // Get a public URL for the uploaded file
-    const { data: { publicUrl } } = supabase
+    const { data: { publicUrl } } = supabaseAdmin
       .storage
       .from('invoices')
       .getPublicUrl(`${invoiceId}/${file.name}`);
 
-    // Update invoice record with file URL
-    const { data: updateData, error: updateError } = await supabase
+    // Update invoice record with file URL, filename, and user ID
+    const { data: updateData, error: updateError } = await (await supabase)
       .from('OINV')
       .update({
         pdf_url: publicUrl,
         pdf_filename: file.name,
+        uuid: userId, // Add the authenticated user's ID
       })
       .eq('DocNum', invoiceId);
 
@@ -81,6 +95,7 @@ console.error('Storage Error:', storageData);
             pdfUrl: publicUrl,
             filename: file.name,
             timestamp: new Date().toISOString(),
+            userId, // Optionally include userId in webhook payload
           }),
         });
       } catch (webhookError) {

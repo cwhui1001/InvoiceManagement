@@ -1,6 +1,5 @@
 // Import Supabase functions
 import {
-  fetchLatestInvoices,
   fetchCardData,
   fetchFilteredInvoices,
   fetchInvoicesPages,
@@ -8,6 +7,8 @@ import {
   fetchCustomers,
   fetchFilteredCustomers,
   fetchCategoryTotals,
+  fetchUsersWithUploads,
+  fetchUserCategoryTotals,
 } from './data-supabase';
 
 // Constants
@@ -16,7 +17,6 @@ const ITEMS_PER_PAGE = 6;
 
 // Export all Supabase functions directly
 export {
-  fetchLatestInvoices,
   fetchCardData,
   fetchFilteredInvoices,
   fetchInvoicesPages,
@@ -24,6 +24,8 @@ export {
   fetchCustomers,
   fetchFilteredCustomers,
   fetchCategoryTotals,
+  fetchUsersWithUploads,
+  fetchUserCategoryTotals,
 };
 
 // Export updateInvoiceStatus function (assuming it's used)

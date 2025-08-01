@@ -1,13 +1,14 @@
 import { CardWrapper, Card } from '@/app/ui/dashboard/cards';
 import { inter } from '@/app/ui/fonts';
-import { fetchLatestInvoices, fetchCardData, fetchCategoryTotals } from '@/app/lib/data';
+import { fetchCardData, fetchCategoryTotals, fetchUsersWithUploads } from '@/app/lib/data';
 import CategoryPieChart from '@/app/ui/dashboard/CategoryPieChart';
+import UserCategoryPieChart from '@/app/ui/dashboard/UserCategoryPieChart';
 
 export default async function Page() {
   console.log('Starting Page render');
-  const latestInvoices = await fetchLatestInvoices();
   const { numberOfInvoices, numberOfPendingInvoices } = await fetchCardData();
   const categoryTotals = await fetchCategoryTotals();
+  const usersWithUploads = await fetchUsersWithUploads();
   
   return (
     <main className="p-4 md:p-6">
@@ -33,6 +34,13 @@ export default async function Page() {
       <div className="mt-6">
         <div className="bg-gradient-to-br from-yellow-50 to-white p-4 rounded-xl shadow-md h-[450px] sm:h-[400px]">
           <CategoryPieChart categoryTotals={categoryTotals} />
+        </div>
+      </div>
+
+      {/* Third row with user category pie chart */}
+      <div className="mt-6">
+        <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl shadow-md h-[600px] sm:h-[550px]">
+          <UserCategoryPieChart users={usersWithUploads} />
         </div>
       </div>
     </main>
