@@ -11,7 +11,7 @@ export default async function Page() {
   const usersWithUploads = await fetchUsersWithUploads();
   
   return (
-    <main className="p-4 md:p-6">
+    <main className="p-4 md:p-4">
       <div className="mb-6">
         <h1 className={`${inter.className} text-3xl font-bold text-gray-900`}>
           Dashboard Overview
@@ -32,7 +32,7 @@ export default async function Page() {
       
       {/* Second row with pie chart (full width) */}
       <div className="mt-6">
-        <div className="bg-gradient-to-br from-yellow-50 to-white p-4 rounded-xl shadow-md h-[450px] sm:h-[400px]">
+        <div className="bg-gradient-to-br from-yellow-50 to-white p-4 rounded-xl shadow-md h-[500px] sm:h-[450px]">
           <CategoryPieChart categoryTotals={categoryTotals} />
         </div>
       </div>

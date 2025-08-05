@@ -1,9 +1,9 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/utils/supabase/server';
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } } // Destructure params directly
 ) {
   try {
     const invoiceId = params.id;
@@ -11,7 +11,6 @@ export async function GET(
 
     console.log('Looking for PDF for invoice DocNum:', invoiceId);
 
-    // Get the PDF URL directly from the OINV table
     const { data: invoiceData, error: invoiceError } = await supabase
       .from('OINV')
       .select('pdf_url, DocNum')
@@ -28,16 +27,14 @@ export async function GET(
 
     console.log('Found invoice data:', invoiceData);
 
-    if (!invoiceData.pdf_url) {
+    if (!invoiceData?.pdf_url) {
       return NextResponse.json(
         { error: `No PDF URL found for invoice ${invoiceId}. Upload a PDF file first.` },
         { status: 404 }
       );
     }
 
-    // Redirect to the PDF URL directly
     return NextResponse.redirect(invoiceData.pdf_url);
-
   } catch (error) {
     console.error('PDF retrieval error:', error);
     return NextResponse.json(

@@ -80,29 +80,18 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        aspectRatio: 1,
+        resizeDelay: 0,
         plugins: {
           legend: { 
-            position: (['bar', 'line'].includes(chartType) ? 'top' : 'right') as any,
+            position: 'bottom' as any,
             labels: {
               boxWidth: 12,
-              padding: 16,
+              padding: 12,
               font: {
-                size: 12
+                size: 11
               },
               usePointStyle: true
-            }
-          },
-          title: { 
-            display: true, 
-            text: 'Revenue by Category',
-            font: {
-              size: 16,
-              weight: 'bold',
-              family: 'Inter, sans-serif'
-            },
-            color: '#111827',
-            padding: {
-              bottom: 16
             }
           },
           tooltip: {
@@ -139,10 +128,15 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
         }),
         layout: {
           padding: {
-            top: 5,
-            bottom: 5,
-            left: 5,
-            right: (['bar', 'line'].includes(chartType) ? 5 : 15)
+            top: 10,
+            bottom: 20,
+            left: 10,
+            right: 10
+          }
+        },
+        animation: {
+          resize: {
+            duration: 300
           }
         }
       }
@@ -159,41 +153,104 @@ export default function CategoryPieChart({ categoryTotals }: CategoryPieChartPro
 
   if (!categoryTotals || categoryTotals.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full p-4">
-        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-          <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+      <div className="h-full">
+        {/* Header with chart type selector */}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">
+              Revenue by Category
+            </h3>
+            <p className="text-sm text-gray-600">
+              View uploaded invoice categories by user
+            </p>
+          </div>
+          <div className="flex gap-3">
+            {/* Chart Type Selector */}
+            <select
+              value={chartType}
+              onChange={(e) => setChartType(e.target.value as ChartType)}
+              className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              {chartTypeOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.icon} {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
-        <p className="text-gray-500 text-center">No category data available</p>
-        <p className="text-gray-400 text-sm mt-1 text-center">Add invoices with categories to see breakdown</p>
+
+        {/* Chart content */}
+        <div className="h-[350px]">
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <div className="text-4xl mb-2">📊</div>
+              <p className="text-gray-500">No category data available</p>
+              <p className="text-sm text-gray-400 mt-1">Add invoices with categories to see breakdown</p>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-full relative p-2">
-      {/* Chart Type Selector */}
-      <div className="flex justify-end mb-3">
-        <select
-          value={chartType}
-          onChange={(e) => setChartType(e.target.value as ChartType)}
-          className="px-3 py-1 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white"
-        >
-          {chartTypeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.icon} {option.label}
-            </option>
-          ))}
-        </select>
+    <div className="h-full">
+      {/* Header with chart type selector */}
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-semibold text-gray-800">
+            Revenue by Category
+          </h3>
+          <p className="text-sm text-gray-600">
+            View uploaded invoice categories by user
+          </p>
+        </div>
+        <div className="flex gap-3">
+          {/* Chart Type Selector */}
+          <select
+            value={chartType}
+            onChange={(e) => setChartType(e.target.value as ChartType)}
+            className="px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          >
+            {chartTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.icon} {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
-      
-      <div className="w-full h-full flex items-center justify-center" style={{ minHeight: '240px' }}>
-        <canvas 
-          ref={canvasRef} 
-          className="max-w-full max-h-full"
-          style={{ width: '100%', height: '100%' }}
-        />
+
+      {/* Chart content */}
+      <div className="h-[350px]">
+        <div className="relative h-full">
+          <div className="h-[calc(100%-50px)]">
+            <canvas 
+              ref={canvasRef} 
+              className="w-full h-full"
+            />
+            {categoryTotals && categoryTotals.length > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-white/90 backdrop-blur-sm rounded-lg border border-gray-200">
+                <div className="text-sm text-gray-600 text-center">
+                  Total invoices across{' '}
+                  <strong>{categoryTotals.length}</strong> categories with a total value of{' '}
+                  <strong>
+                  {new Intl.NumberFormat('en-US', {
+                    style: 'currency',
+                    currency: 'USD',
+                  }).format(categoryTotals.reduce((sum, item) => sum + item.TotalAmount, 0))}
+                </strong>
+              </div>
+            </div>
+          )}
+            
+            
+          </div>
+          
+          {/* Summary info at bottom */}
+          
+        </div>
       </div>
     </div>
   );

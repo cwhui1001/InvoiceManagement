@@ -1,0 +1,34 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_HOST=localhost
+      - WEBHOOK_URL=https://a760ad83f9b0.ngrok-free.app
+      - N8N_EDITOR_BASE_URL=https://a760ad83f9b0.ngrok-free.app
+      - GENERIC_TIMEZONE=UTC
+    volumes:
+      - ./n8n:/home/node/.n8n
+    depends_on:
+      - ngrok
+    networks:
+      - n8n-network
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    restart: always
+    command: http n8n:5678
+    ports:
+      - "4040:4040"
+    environment:
+      - NGROK_AUTHTOKEN=2zMG77fQk0mZaQHtGBnR9vaT55h_7AwzVyZMwxzdk7NCTJyfx
+    networks:
+      - n8n-network
+
+networks:
+  n8n-network:
+    driver: bridge
