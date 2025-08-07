@@ -19,6 +19,8 @@
     "dotenv": "^17.0.1",
     "framer-motion": "^12.23.9",
     "jwt-decode": "^4.0.0",
+    "lucide": "^0.536.0",
+    "lucide-react": "^0.536.0",
     "next": "latest",
     "next-auth": "5.0.0-beta.25",
     "postcss": "8.5.1",

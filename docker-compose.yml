@@ -8,8 +8,8 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=https
       - N8N_HOST=localhost
-      - WEBHOOK_URL=https://a760ad83f9b0.ngrok-free.app
-      - N8N_EDITOR_BASE_URL=https://a760ad83f9b0.ngrok-free.app
+      - WEBHOOK_URL=https://dc1473f34e2c.ngrok-free.app
+      - N8N_EDITOR_BASE_URL=https://dc1473f34e2c.ngrok-free.app
       - GENERIC_TIMEZONE=UTC
     volumes:
       - ./n8n:/home/node/.n8n

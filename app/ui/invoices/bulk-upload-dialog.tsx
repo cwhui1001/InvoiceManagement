@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { CloudArrowUpIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import { useUploadWithProgress } from '@/app/hooks/useUploadWithProgress';
+import { useUpload } from '@/app/contexts/UploadContext';
 
 export default function BulkUploadDialog({
   isOpen,
@@ -12,12 +14,46 @@ export default function BulkUploadDialog({
   isOpen: boolean;
   onClose: () => void;
 }) {
-  const [isUploading, setIsUploading] = useState(false);
+  console.log('🔥🔥🔥 BULK UPLOAD DIALOG COMPONENT RENDERED 🔥🔥🔥', { isOpen });
+  
+  // Add event listener to catch any form submissions
+  useEffect(() => {
+    const handleFormSubmit = (e: any) => {
+      console.log('🚨🚨🚨 FORM SUBMISSION DETECTED 🚨🚨🚨', e);
+    };
+    
+    const handleFileChange = (e: any) => {
+      console.log('🚨🚨🚨 FILE INPUT CHANGE DETECTED 🚨🚨🚨', e);
+      if (e.target && e.target.files) {
+        console.log('🚨🚨🚨 FILES SELECTED:', Array.from(e.target.files).map((f: any) => f.name));
+      }
+    };
+    
+    const handleDragDrop = (e: any) => {
+      console.log('🚨🚨🚨 DRAG/DROP EVENT DETECTED 🚨🚨🚨', e.type, e);
+    };
+    
+    // Global event listeners
+    document.addEventListener('submit', handleFormSubmit);
+    document.addEventListener('change', handleFileChange, true); // Use capture phase
+    document.addEventListener('dragover', handleDragDrop);
+    document.addEventListener('drop', handleDragDrop);
+    
+    return () => {
+      document.removeEventListener('submit', handleFormSubmit);
+      document.removeEventListener('change', handleFileChange, true);
+      document.removeEventListener('dragover', handleDragDrop);
+      document.removeEventListener('drop', handleDragDrop);
+    };
+  }, []);
+  
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const router = useRouter();
+  const { uploadFiles } = useUploadWithProgress();
+  const { addUpload } = useUpload(); // Add this for testing
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -41,57 +77,37 @@ export default function BulkUploadDialog({
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return;
 
-    setIsUploading(true);
+    console.log('=== DIALOG HANDLE UPLOAD CALLED ===');
+    console.log('Selected files:', selectedFiles.map(f => f.name));
+    console.log('uploadFiles function:', typeof uploadFiles);
+
     setError('');
     setSuccess('');
 
     try {
-      const formData = new FormData();
-      selectedFiles.forEach(file => {
-        formData.append('file', file); // Changed from 'files' to 'file' to match the API
-      });
+      console.log('BulkUploadDialog: Starting upload for files:', selectedFiles.map(f => f.name));
+      
+      // Start the upload with n8n progress tracking (shown in bottom-right corner)
+      console.log('BulkUploadDialog: About to call uploadFiles hook');
+      await uploadFiles(selectedFiles);
+      console.log('BulkUploadDialog: uploadFiles hook completed');
 
-      const response = await fetch('/api/invoices/bulk-upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to upload files.');
-      }
-
-      // Handle the new response format with detailed results
-      if (result.detailedResults) {
-        const failures = result.failedUploads || [];
-        const successes = result.successfulUploads || [];
-        
-        if (failures.length > 0) {
-          console.error('Some files failed to upload:', failures);
-          const errorMessages = failures.map((f: any) => `${f.filename}: ${f.error}`).join('\n');
-          setError(`${successes.length} files uploaded successfully, ${failures.length} failed:\n${errorMessages}`);
-        } else {
-          setSuccess(result.message);
-        }
-      } else {
-        setSuccess(result.message);
-      }
-
+      console.log('BulkUploadDialog: Upload completed successfully');
+      
+      // Show success message and close dialog immediately
+      setSuccess('Files uploaded successfully! n8n OCR processing will be shown in bottom-right corner.');
       setShowConfirmation(false);
       
-      // Auto-close after 2 seconds on success
+      // Close dialog immediately - n8n progress will be shown in bottom-right corner
       setTimeout(() => {
-        router.refresh(); // Refresh the page
         onClose();
         resetDialog();
-      }, 2000);
+        router.refresh(); // Refresh the page
+      }, 1500);
 
     } catch (err) {
-      console.error('Upload Error:', err);
+      console.error('BulkUploadDialog: Upload Error:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload files.');
-    } finally {
-      setIsUploading(false);
     }
   };
 
@@ -100,7 +116,6 @@ export default function BulkUploadDialog({
     setShowConfirmation(false);
     setError('');
     setSuccess('');
-    setIsUploading(false);
   };
 
   const handleClose = () => {
@@ -148,6 +163,7 @@ export default function BulkUploadDialog({
                 The system will automatically extract invoice information and link files to invoices when possible.
               </p>
             </div>
+
             
             {!showConfirmation ? (
               // File Selection Phase
@@ -168,7 +184,6 @@ export default function BulkUploadDialog({
                         multiple
                         className="sr-only"
                         onChange={handleFileChange}
-                        disabled={isUploading}
                       />
                     </label>
                   </div>
@@ -240,15 +255,6 @@ export default function BulkUploadDialog({
                 {success && (
                   <p className="text-sm text-green-600">{success}</p>
                 )}
-                
-                {isUploading && (
-                  <div className="flex items-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-                    <p className="text-sm text-gray-600">
-                      Uploading files...
-                    </p>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -257,7 +263,6 @@ export default function BulkUploadDialog({
             <button
               onClick={handleClose}
               className="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              disabled={isUploading}
             >
               Cancel
             </button>
@@ -265,10 +270,10 @@ export default function BulkUploadDialog({
             {showConfirmation && (
               <button
                 onClick={handleUpload}
-                disabled={isUploading || selectedFiles.length === 0}
+                disabled={selectedFiles.length === 0}
                 className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isUploading ? 'Uploading...' : `Upload ${selectedFiles.length} File${selectedFiles.length > 1 ? 's' : ''}`}
+                Upload {selectedFiles.length} File{selectedFiles.length > 1 ? 's' : ''}
               </button>
             )}
           </div>

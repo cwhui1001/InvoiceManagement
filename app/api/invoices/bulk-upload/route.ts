@@ -2,9 +2,12 @@ import { NextResponse } from 'next/server';
 import { createAdminClient, createClient } from '@/utils/supabase/server';
 
 export async function POST(request: Request) {
+  console.log('=== BULK UPLOAD API CALLED ==='); // Debug log
   try {
     const formData = await request.formData();
     const files = formData.getAll('file') as File[];
+
+    console.log(`Received ${files.length} files for upload`); // Debug log
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -99,6 +102,72 @@ console.error('Storage Error:', storageData);
           throw new Error(`Database error: ${dbError.message}`);
         }
 
+        // 6. Trigger processing workflow (n8n will handle OCR and linking)
+        let executionId = null;
+        if (n8nWebhook) {
+          console.log(`Calling n8n webhook: ${n8nWebhook}`); // Debug log
+          try {
+            const n8nResponse = await fetch(n8nWebhook, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                type: 'invoice_upload',
+                action: 'process',
+                pdf: {
+                  id: pdfRecord.id,
+                  uuid: pdfRecord.pdf_uuid,
+                  url: publicUrl,
+                  originalName: file.name,
+                  storedName: filename
+                },
+                timestamp: new Date().toISOString()
+              })
+            });
+            
+            console.log(`n8n response status: ${n8nResponse.status}`); // Debug log
+            
+            if (n8nResponse.ok) {
+              const n8nResult = await n8nResponse.json();
+              console.log('n8n response body:', n8nResult); // Debug log
+              executionId = n8nResult.executionId || null;
+              
+              // If no executionId in webhook response, try to get latest execution from n8n API
+              if (!executionId && process.env.N8N_URL && process.env.N8N_API_KEY) {
+                console.log('No executionId from webhook, trying to get latest execution from n8n API'); // Debug log
+                try {
+                  const executionsResponse = await fetch(`${process.env.N8N_URL}/api/v1/executions?limit=1`, {
+                    headers: {
+                      'X-N8N-API-KEY': process.env.N8N_API_KEY,
+                      'Content-Type': 'application/json'
+                    }
+                  });
+                  
+                  if (executionsResponse.ok) {
+                    const executionsData = await executionsResponse.json();
+                    if (executionsData.data && executionsData.data.length > 0) {
+                      executionId = executionsData.data[0].id;
+                      console.log(`Got execution ID from n8n API: ${executionId}`); // Debug log
+                    }
+                  } else {
+                    console.error('Failed to get executions from n8n API:', executionsResponse.status);
+                  }
+                } catch (apiError) {
+                  console.error('Error calling n8n API for executions:', apiError);
+                }
+              }
+              
+              console.log(`n8n workflow triggered for ${file.name}, execution ID: ${executionId}`);
+            } else {
+              const errorText = await n8nResponse.text();
+              console.error(`n8n webhook failed with status ${n8nResponse.status}:`, errorText);
+            }
+          } catch (error) {
+            console.error('Webhook failed:', error);
+          }
+        } else {
+          console.log('No n8n webhook URL configured'); // Debug log
+        }
+
         // 6. Prepare success response
         uploadResults.push({
           filename: file.name,
@@ -107,31 +176,10 @@ console.error('Storage Error:', storageData);
           storageFilename: filename,
           pdfId: pdfRecord.id,
           pdfUuid: pdfRecord.pdf_uuid,
+          executionId: executionId, // Include execution ID for progress tracking
           invoiceNumber: null, // No invoice linked initially
           invoiceStatus: null
         });
-
-        // 7. Trigger processing workflow (n8n will handle OCR and linking)
-        if (n8nWebhook) {
-          await fetch(n8nWebhook, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              type: 'invoice_upload',
-              action: 'process',
-              pdf: {
-                id: pdfRecord.id,
-                uuid: pdfRecord.pdf_uuid,
-                url: publicUrl,
-                originalName: file.name,
-                storedName: filename
-              },
-              timestamp: new Date().toISOString()
-            })
-          }).catch(error => {
-            console.error('Webhook failed:', error);
-          });
-        }
 
       } catch (error) {
         console.error(`File processing failed: ${file.name}`, error);
