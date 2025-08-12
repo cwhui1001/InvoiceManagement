@@ -18,8 +18,9 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false });
 
     // If invoiceId is provided, filter by it
+    // Linking by legacy oinv_uuid removed. If invoiceId filtering needed, adjust schema (e.g., store docnum on pdf row)
     if (invoiceId) {
-      query = query.eq('oinv_uuid', invoiceId);
+      console.warn('invoiceId filter ignored: legacy oinv_uuid removed');
     }
 
     const { data: pdfs, error } = await query;
@@ -35,10 +36,8 @@ export async function GET(request: Request) {
     // Transform the data to include user information
     const transformedPdfs = (pdfs || []).map(pdf => ({
       ...pdf,
-      invoice_docnum: pdf.oinv_uuid || null, // Show the linked invoice UUID or null
-      uploader_display: user?.email ? 
-        user.email.split('@')[0] : // Show username part of email
-        'Current User' // Show current user since we don't store uploader info yet
+      invoice_docnum: null,
+      uploader_display: pdf.uploader_username || (user?.email ? user.email.split('@')[0] : 'Unknown')
     }));
 
     return NextResponse.json({

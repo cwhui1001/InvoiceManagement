@@ -154,7 +154,7 @@ export async function DELETE(
     const { data: linkedPdfs, error: pdfError } = await supabase
       .from('pdf')
       .select('pdf_uuid, pdf_filename')
-      .eq('oinv_uuid', invoiceData.uuid);
+        .eq('oinv_uuid', invoiceData.uuid); // Legacy oinv_uuid reference removed; no direct PDF linking now.
 
     if (pdfError) {
       console.error('Error finding linked PDFs:', pdfError);
@@ -181,10 +181,10 @@ export async function DELETE(
 
     // Update PDF records to unlink them (set oinv_uuid to null)
     // This prevents foreign key constraint violations
-    const { error: unlinkPdfError } = await supabase
-      .from('pdf')
-      .update({ oinv_uuid: null })
-      .eq('oinv_uuid', invoiceData.uuid);
+      const { error: unlinkPdfError } = await supabase
+        .from('pdf')
+        .update({ oinv_uuid: null }) // Legacy unlink skipped (oinv_uuid removed)
+        .eq('oinv_uuid', invoiceData.uuid);
 
     if (unlinkPdfError) {
       console.error('Error unlinking PDFs:', unlinkPdfError);

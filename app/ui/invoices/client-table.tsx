@@ -19,11 +19,9 @@ export default function ClientInvoiceTable({
 }) {
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedInvoices, setSelectedInvoices] = useState<string[]>([]);
   const [refreshKey, setRefreshKey] = useState(0);
-  const itemsPerPage = 10;
 
   // Debug logging
   console.log('Invoices data:', invoices.map(inv => ({
@@ -74,7 +72,6 @@ export default function ClientInvoiceTable({
       setSortField(field);
       setSortDirection('asc');
     }
-    setCurrentPage(1); // Reset to first page when sorting
   };
 
   const sortedInvoices = [...invoices].sort((a, b) => {
@@ -106,17 +103,11 @@ export default function ClientInvoiceTable({
     }
   });
 
-  // Pagination logic
-  const totalPages = Math.ceil(sortedInvoices.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentInvoices = sortedInvoices.slice(startIndex, endIndex);
-
   // Bulk selection functions
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      const currentInvoiceIds = currentInvoices.map(invoice => invoice.id);
-      setSelectedInvoices(currentInvoiceIds);
+      const allInvoiceIds = sortedInvoices.map(invoice => invoice.id);
+      setSelectedInvoices(allInvoiceIds);
     } else {
       setSelectedInvoices([]);
     }
@@ -139,23 +130,6 @@ export default function ClientInvoiceTable({
     // This will trigger a re-render and the parent component should refetch data
   };
 
-  const handlePageChange = (page: number) => {
-    setCurrentPage(page);
-  };
-
-  const PaginationButton = ({ page, isActive }: { page: number; isActive: boolean }) => (
-    <button
-      onClick={() => handlePageChange(page)}
-      className={`px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-        isActive
-          ? 'bg-blue-600 text-white'
-          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-      }`}
-    >
-      {page}
-    </button>
-  );
-
   const SortableHeader = ({ field, children }: { field: SortField; children: React.ReactNode }) => (
     <th 
       scope="col" 
@@ -176,7 +150,7 @@ export default function ClientInvoiceTable({
     </th>
   );
   return (
-    <div className="mt-6 flow-root pb-20">
+    <div className="mt-6 flow-root pb-6">
       {/* Bulk Actions */}
       <BulkActions
         selectedInvoices={selectedInvoices}
@@ -188,7 +162,7 @@ export default function ClientInvoiceTable({
         <div className="rounded-xl bg-white shadow-lg border border-gray-100 overflow-hidden">
           {/* Mobile View */}
           <div className="md:hidden divide-y divide-gray-100">
-            {currentInvoices?.map((invoice: InvoicesTable) => (
+            {sortedInvoices?.map((invoice: InvoicesTable) => (
               <div
                 key={invoice.id}
                 className="p-6 hover:bg-blue-50 transition-colors duration-200"
@@ -201,31 +175,25 @@ export default function ClientInvoiceTable({
                       onChange={(e) => handleSelectInvoice(invoice.id, e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
-                    <button
-                      onClick={() => handlePdfView(invoice.id)}
-                      className={`font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1 ${
-                        invoice.pdf_url 
-                          ? 'text-blue-600 hover:text-blue-800' 
-                          : 'text-gray-500 hover:text-gray-700'
-                      }`}
-                      title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
-                    >
-                      #{invoice.docNum || invoice.id}
-                      {invoice.pdf_url && (
-                        <DocumentIcon className="h-4 w-4 text-blue-500" />
-                      )}
-                    </button>
-                    {/* Show uploader info for debugging */}
-                    {invoice.uploader_username && (
-                      <span className="text-xs text-gray-500 mt-1 block">
-                        uploaded by {invoice.uploader_username}
+                    <div className="flex flex-col">
+                      <button
+                        onClick={() => handlePdfView(invoice.id)}
+                        className="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1"
+                        title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
+                      >
+                        #{invoice.docNum || invoice.id}
+                        {invoice.pdf_url && (
+                          <DocumentIcon className="h-4 w-4 text-blue-500" />
+                        )}
+                      </button>
+                      <span className="text-xs text-gray-500 mt-0.5">
+                        {invoice.uploader_username
+                          ? `uploaded by ${invoice.uploader_username}`
+                          : invoice.has_uploaded_pdf
+                            ? 'uploaded file'
+                            : 'uploaded by user'}
                       </span>
-                    )}
-                    {!invoice.uploader_username && invoice.has_uploaded_pdf && (
-                      <span className="text-xs text-red-500 mt-1 block">
-                        PDF uploaded (no username)
-                      </span>
-                    )}
+                    </div>
                     <div>
                       <p className="font-semibold text-gray-900">{invoice.name}</p>
                       <p className="text-sm text-gray-500 font-medium">{formatDateFromObject(invoice.date)}</p>
@@ -255,7 +223,7 @@ export default function ClientInvoiceTable({
                   <th scope="col" className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     <input
                       type="checkbox"
-                      checked={selectedInvoices.length === currentInvoices.length && currentInvoices.length > 0}
+                      checked={selectedInvoices.length === sortedInvoices.length && sortedInvoices.length > 0}
                       onChange={(e) => handleSelectAll(e.target.checked)}
                       className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                     />
@@ -271,7 +239,7 @@ export default function ClientInvoiceTable({
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-100">
-                {currentInvoices?.map((invoice: InvoicesTable) => (
+                {sortedInvoices?.map((invoice: InvoicesTable) => (
                   <tr
                     key={invoice.id}
                     className="hover:bg-blue-50 transition-colors duration-200"
@@ -286,31 +254,25 @@ export default function ClientInvoiceTable({
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col">
-                        <button
-                          onClick={() => handlePdfView(invoice.id)}
-                          className={`font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1 ${
-                            invoice.pdf_url 
-                              ? 'text-blue-600 hover:text-blue-800' 
-                              : 'text-gray-500 hover:text-gray-700'
-                          }`}
-                          title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
-                        >
-                          #{invoice.docNum || invoice.id}
-                          {invoice.pdf_url && (
-                            <DocumentIcon className="h-4 w-4 text-blue-500" />
-                          )}
-                        </button>
-                        {/* Show uploader info for debugging */}
-                        {invoice.uploader_username && (
-                          <span className="text-xs text-gray-500 mt-1 block">
-                            uploaded by {invoice.uploader_username}
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => handlePdfView(invoice.id)}
+                            className="text-blue-600 hover:text-blue-800 font-semibold hover:underline transition-colors cursor-pointer flex items-center gap-1"
+                            title={invoice.pdf_url ? 'Click to view PDF' : 'No PDF available'}
+                          >
+                            #{invoice.docNum || invoice.id}
+                            {invoice.pdf_url && (
+                              <DocumentIcon className="h-4 w-4 text-blue-500" />
+                            )}
+                          </button>
+                          <span className="text-xs text-gray-500 mt-0.5">
+                            {invoice.uploader_username
+                              ? `uploaded by ${invoice.uploader_username}`
+                              : invoice.has_uploaded_pdf
+                                ? 'uploaded file'
+                                : 'uploaded by user'}
                           </span>
-                        )}
-                        {!invoice.uploader_username && invoice.has_uploaded_pdf && (
-                          <span className="text-xs text-red-500 mt-1 block">
-                            PDF uploaded (no username)
-                          </span>
-                        )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -339,54 +301,6 @@ export default function ClientInvoiceTable({
                 ))}
               </tbody>
             </table>
-          </div>
-        </div>
-      </div>
-      
-      {/* Sticky Bottom Pagination */}
-      <div className={`fixed bottom-0 left-64 right-0 bg-white border-t border-gray-200 shadow-lg ${isModalOpen ? 'z-[1]' : 'z-40'} md:left-64 left-0`}>
-        <div className="px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center text-sm text-gray-700">
-            <span>
-              Showing {startIndex + 1} to {Math.min(endIndex, sortedInvoices.length)} of {sortedInvoices.length} results
-            </span>
-          </div>
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className={`p-2 rounded-md transition-colors ${
-                currentPage === 1
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <ChevronLeftIcon className="h-5 w-5" />
-            </button>
-            
-            {/* Page Numbers */}
-            <div className="flex space-x-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <PaginationButton key={page} page={page} isActive={page === currentPage} />
-              ))}
-            </div>
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages}
-              className={`p-2 rounded-md transition-colors ${
-                currentPage === totalPages
-                  ? 'text-gray-400 cursor-not-allowed'
-                  : 'text-gray-700 hover:bg-gray-100'
-              }`}
-            >
-              <ChevronRightIcon className="h-5 w-5" />
-            </button>
-          </div>
-          <div className="flex items-center text-sm text-gray-700">
-            <span>
-              Page {currentPage} of {totalPages}
-            </span>
           </div>
         </div>
       </div>

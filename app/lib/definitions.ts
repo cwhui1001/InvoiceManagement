@@ -166,7 +166,6 @@ export type PdfFile = {
   id: number;
   pdf_uuid: string;
   created_at: string;
-  oinv_uuid: string | null;
   pdf_url: string;
   pdf_filename: string;
   uploaded_by?: string;

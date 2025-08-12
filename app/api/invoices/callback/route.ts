@@ -70,6 +70,12 @@ export async function POST(request: Request) {
         pdf_filename: pdfFilename || originalFilename
       };
 
+      // If the callback includes a username/uploader, persist it for per-user category aggregation
+      const callbackUsername = body.username || body.uploader_username || body.user;
+      if (callbackUsername) {
+        updateData.username = callbackUsername;
+      }
+
       // Update other fields if they were extracted and are different
       if (customerName && customerName !== existingInvoice.CustName) {
         updateData.CustName = customerName;
@@ -109,6 +115,7 @@ export async function POST(request: Request) {
       // Create new invoice record if it doesn't exist
       console.log('Creating new invoice:', searchId);
       
+      const callbackUsernameNew = body.username || body.uploader_username || body.user;
       const { error: insertError } = await supabase
         .from('OINV')
         .insert({
@@ -118,7 +125,8 @@ export async function POST(request: Request) {
           DocDate: invoiceDate || new Date().toISOString().split('T')[0],
           Status: status || 'pending',
           pdf_url: finalPdfUrl,
-          pdf_filename: pdfFilename || originalFilename
+          pdf_filename: pdfFilename || originalFilename,
+          username: callbackUsernameNew || null
         });
 
       if (insertError) {

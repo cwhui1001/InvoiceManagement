@@ -1,14 +1,16 @@
 import { CardWrapper, Card } from '@/app/ui/dashboard/cards';
 import { inter } from '@/app/ui/fonts';
-import { fetchCardData, fetchCategoryTotals, fetchUsersWithUploads } from '@/app/lib/data';
+import { fetchCardData, fetchCategoryTotals, fetchUsersWithUploads, fetchTopUploaders } from '@/app/lib/data';
 import CategoryPieChart from '@/app/ui/dashboard/CategoryPieChart';
 import UserCategoryPieChart from '@/app/ui/dashboard/UserCategoryPieChart';
+import TopUploaders from '@/app/ui/dashboard/TopUploaders';
 
 export default async function Page() {
   console.log('Starting Page render');
   const { numberOfInvoices, numberOfPendingInvoices } = await fetchCardData();
   const categoryTotals = await fetchCategoryTotals();
   const usersWithUploads = await fetchUsersWithUploads();
+  const topUploaders = await fetchTopUploaders();
   
   return (
     <main className="p-4 md:p-4">
@@ -41,6 +43,13 @@ export default async function Page() {
       <div className="mt-6">
         <div className="bg-gradient-to-br from-blue-50 to-white p-4 rounded-xl shadow-md h-[600px] sm:h-[550px]">
           <UserCategoryPieChart users={usersWithUploads} />
+        </div>
+      </div>
+
+      {/* Fourth row with top uploaders */}
+      <div className="mt-6">
+        <div className="bg-gradient-to-br from-green-50 to-white rounded-xl shadow-md">
+          <TopUploaders uploaders={topUploaders} />
         </div>
       </div>
     </main>

@@ -17,37 +17,29 @@ import { formatCurrency, convertFromDateInputFormat, parseStringToDate, formatDa
 // Constants
 const ITEMS_PER_PAGE = 6;
 
-
-
 // Fetch card data from OINV table
 export async function fetchCardData() {
   try {
     const supabase = await createClient();
 
-    // Count total invoices
     const { count: invoiceCount, error: invoiceError } = await supabase
       .from('OINV')
       .select('*', { count: 'exact', head: true });
-
     if (invoiceError) throw invoiceError;
 
-    // Count pending invoices
     const { count: pendingCount, error: pendingError } = await supabase
       .from('OINV')
       .select('*', { count: 'exact', head: true })
       .eq('Status', 'Pending');
-
     if (pendingError) throw pendingError;
 
-    // Get totals
     const { data: totalsData, error: totalsError } = await supabase
       .from('OINV')
       .select('TotalwithGST, Totalb4GST');
-
     if (totalsError) throw totalsError;
 
-    const totalRevenue = totalsData.reduce((sum: number, invoice: any) => {
-      const amount = invoice.TotalwithGST || invoice.Totalb4GST || 0;
+    const totalRevenue = (totalsData || []).reduce((sum: number, inv: any) => {
+      const amount = inv.TotalwithGST || inv.Totalb4GST || 0;
       return sum + amount;
     }, 0);
 
@@ -72,147 +64,91 @@ export async function fetchFilteredInvoices(
   amountMin?: string,
   amountMax?: string
 ) {
-  const offset = (currentPage - 1) * ITEMS_PER_PAGE;
-
   try {
-    const supabase = await createAdminClient(); // Using admin client to bypass auth issues
-    
-    // First, get invoices
+  const supabase = await createClient();
+  // Use admin client just for PDF table (RLS likely blocking anon)
+  const admin = createAdminClient();
+    const offset = (currentPage - 1) * ITEMS_PER_PAGE;
+
     let queryBuilder = supabase
       .from('OINV')
-      .select('*');
+      .select('*')
+      .or(`CustName.ilike.%${query}%,DocNum.ilike.%${query}%,CustCode.ilike.%${query}%,VendorName.ilike.%${query}%`);
 
-    // Add search filter if query is provided
-    if (query) {
-      queryBuilder = queryBuilder.or(
-        `CustName.ilike.%${query}%,DocNum.ilike.%${query}%,VendorName.ilike.%${query}%`
-      );
-    }
-
-    // Add status filter if provided
     if (status) {
-      const normalizedStatus = status.toLowerCase();
-      let dbStatus: string;
-      if (normalizedStatus === 'done') dbStatus = 'Done';
-      else if (normalizedStatus === 'pending') dbStatus = 'Pending';
-      else {
-        console.warn('fetchFilteredInvoices - Unsupported status value:', status, 'defaulting to no filter');
-        dbStatus = '';
-      }
-      if (dbStatus) {
-        queryBuilder = queryBuilder.eq('Status', dbStatus);
-        console.log('fetchFilteredInvoices - Applied status filter:', dbStatus);
-      }
+      const dbStatus = status.toLowerCase() === 'done' ? 'Done' : 'Pending';
+      queryBuilder = queryBuilder.eq('Status', dbStatus);
+      console.log('fetchFilteredInvoices - Applied status filter:', dbStatus);
     }
 
-    // Fetch all records first (we'll apply date and amount filtering in JavaScript)
-    const { data: invoices, error } = await queryBuilder
-      .order('DocDate', { ascending: false });
-
+    const { data: invoices, error } = await queryBuilder.order('DocDate', { ascending: false });
     if (error) throw error;
 
-    // Get PDF upload information with uploader details (fallback if foreign key fails)
+    // Fetch PDFs with admin client
     let pdfUploads: any[] = [];
-    let pdfError;
-
     try {
-      // Try to get PDFs with profile join first
-      const { data, error } = await supabase
+      console.log('[fetchFilteredInvoices] Fetching PDFs with admin client...');
+      const { data: pdfs, error: pdfErr } = await admin
         .from('pdf')
-        .select(`
-          *,
-          uploader_profile:uploader_user_id(
-            id,
-            username,
-            full_name,
-            email
-          )
-        `);
-      pdfUploads = data ?? [];
-      pdfError = error;
-    } catch (err) {
-      console.warn('Profile join failed, falling back to simple query');
-      pdfError = err;
+        .select('id,pdf_filename,pdf_url,uploader_username,created_at')
+        .order('created_at', { ascending: false })
+        .limit(500);
+      if (pdfErr) throw pdfErr;
+      pdfUploads = pdfs || [];
+      console.log(`[fetchFilteredInvoices] Retrieved ${pdfUploads.length} PDFs (first 2):`, pdfUploads.slice(0,2));
+    } catch (e) {
+      console.error('[fetchFilteredInvoices] Admin PDF fetch failed:', e);
     }
 
-    if (pdfError) {
-      console.warn('Error fetching PDF uploads with profiles:', pdfError);
-      // Fallback to simple query without profile join
-      const { data: fallbackPdfs, error: fallbackError } = await supabase
-        .from('pdf')
-        .select('*');
-      
-      if (fallbackError) {
-        console.error('Fallback PDF query also failed:', fallbackError);
-        pdfUploads = [];
-      } else {
-        pdfUploads = fallbackPdfs ?? [];
-        console.log('Using fallback PDF query without profiles');
-      }
-    }
-    
-    console.log('PDF uploads found:', pdfUploads?.length || 0);
-    console.log('Sample PDFs:', pdfUploads?.slice(0, 2));
-    
-    // For demo purposes, if we have any PDFs in the system, show them as uploaded by someone
-    const hasPdfsInSystem = (pdfUploads?.length || 0) > 0;
+    // Heuristic: try to match invoice DocNum inside original filename (after removing timestamp prefix)
+    const matchPdfForInvoice = (docNum: any) => {
+      if (!docNum) return null;
+      const docStr = String(docNum).toLowerCase();
+      return pdfUploads.find(p => {
+        if (!p.pdf_filename) return false;
+        const cleaned = p.pdf_filename.replace(/^\d+-/, '').toLowerCase();
+        return cleaned.includes(docStr);
+      }) || null;
+    };
 
-    // Transform data to match expected format for the UI
-    let transformedInvoices = invoices.map((invoice: any, index: number) => {
-      // Find PDF uploads for this invoice (by UUID) - only if both UUIDs are not null
-      const relatedPdfs = pdfUploads?.filter(pdf => 
-        pdf.oinv_uuid && invoice.uuid && pdf.oinv_uuid === invoice.uuid
-      ) || [];
-      const latestPdf = relatedPdfs.length > 0 ? relatedPdfs[0] : null;
-      
-      console.log(`Invoice ${invoice.DocNum} (UUID: ${invoice.uuid}) - found ${relatedPdfs.length} PDFs`);
-      
-      // Determine uploader information - prioritize real database data over demo data
-      let uploaderUsername = null;
+    // Pre-build maps for quick lookup
+    const pdfByFilename = new Map<string, any>();
+    const pdfByUrl = new Map<string, any>();
+    pdfUploads.forEach(p => {
+      if (p.pdf_filename) pdfByFilename.set(p.pdf_filename, p);
+      if (p.pdf_url) pdfByUrl.set(p.pdf_url, p);
+    });
+
+    let transformedInvoices = (invoices || []).map((invoice: any) => {
+      let uploaderUsername: string | null = null;
       let hasUploadedPdf = false;
-      let pdfUrl = null;
-      
-      // First check if this invoice has any PDFs with actual uploader data
-      const pdfsWithUploaderData = pdfUploads?.filter(pdf => 
-        pdf.uploader_username && pdf.uploader_username !== null
-      ) || [];
-      
-      if (latestPdf) {
-        // This invoice has a directly linked PDF - use actual uploader data
-        hasUploadedPdf = true;
-        pdfUrl = latestPdf.pdf_url;
-        
-        // Get username from the PDF record
-        if (latestPdf.uploader_username) {
-          uploaderUsername = latestPdf.uploader_username;
-          console.log(`Invoice ${invoice.DocNum} - using stored username: ${uploaderUsername}`);
-        } else if (latestPdf.uploader_profile?.username) {
-          uploaderUsername = latestPdf.uploader_profile.username;
-          console.log(`Invoice ${invoice.DocNum} - using profile username: ${uploaderUsername}`);
-        } else {
-          uploaderUsername = 'unknown_user';
-          console.log(`Invoice ${invoice.DocNum} - no uploader info found, using fallback`);
-        }
-      } else if (pdfsWithUploaderData.length > 0 && index < pdfsWithUploaderData.length) {
-        // Use real uploader data from any PDF in the system for demo purposes
-        hasUploadedPdf = true;
-        pdfUrl = pdfsWithUploaderData[index % pdfsWithUploaderData.length].pdf_url;
-        uploaderUsername = pdfsWithUploaderData[index % pdfsWithUploaderData.length].uploader_username;
-        console.log(`Invoice ${invoice.DocNum} - using real uploader from PDFs: ${uploaderUsername}`);
-      } else if (hasPdfsInSystem && index < 5) {
-        // Only if no real uploader data exists, fall back to demo usernames
-        hasUploadedPdf = true;
-        pdfUrl = '/placeholder-pdf';
-        
-        // Use real usernames from your profiles table for demo
-        const realUsers = ['jungkook09', 'gracelyn', 'cwhui_1001'];
-        uploaderUsername = realUsers[index % realUsers.length];
-        console.log(`Invoice ${invoice.DocNum} - using real profile: ${uploaderUsername} (index: ${index})`);
+      let pdfUrl: string | null = invoice.pdf_url || null; // may already be on invoice
+
+      // 1. Direct invoice.username column if present
+      if (invoice.username) {
+        uploaderUsername = invoice.username;
+        hasUploadedPdf = !!(invoice.pdf_url || invoice.pdf_filename);
       } else {
-        console.log(`Invoice ${invoice.DocNum} - no PDF path taken`);
+        // 2. Try exact filename match
+        let matched: any = null;
+        if (invoice.pdf_filename && pdfByFilename.has(invoice.pdf_filename)) {
+          matched = pdfByFilename.get(invoice.pdf_filename);
+        }
+        // 3. Try exact url match
+        if (!matched && invoice.pdf_url && pdfByUrl.has(invoice.pdf_url)) {
+          matched = pdfByUrl.get(invoice.pdf_url);
+        }
+        // 4. Try heuristic match (DocNum inside filename) if still nothing
+        if (!matched) matched = matchPdfForInvoice(invoice.DocNum);
+
+        if (matched) {
+          uploaderUsername = matched.uploader_username || null;
+          if (!pdfUrl) pdfUrl = matched.pdf_url || null;
+          hasUploadedPdf = true;
+        }
       }
-      
-      const result = {
+
+      return {
         id: invoice.DocNum,
         customer_id: invoice.CustCode || invoice.DocNum,
         name: invoice.CustName || 'Unknown Customer',
@@ -222,68 +158,39 @@ export async function fetchFilteredInvoices(
         date: parseStringToDate(invoice.DocDate) || new Date(),
         amount: invoice.TotalwithGST || invoice.Totalb4GST || 0,
         status: invoice.Status === 'Done' ? 'done' : 'pending',
-        pdf_url: pdfUrl, // Use the pdfUrl variable we set above
+        pdf_url: pdfUrl,
         delivery_date: invoice.DeliveryDate ? parseStringToDate(invoice.DeliveryDate) : null,
         uploader_username: uploaderUsername,
         has_uploaded_pdf: hasUploadedPdf,
       };
-      
-      if (hasUploadedPdf) {
-        console.log(`Invoice ${invoice.DocNum} - showing uploader: ${result.uploader_username}`);
-      }
-      
-      return result;
     });
 
-    // Apply date filtering in JavaScript
     if (dateFrom || dateTo) {
-      transformedInvoices = transformedInvoices.filter(invoice => {
-        const invoiceDate = invoice.date;
-        if (!invoiceDate) return false;
-        
-        let passesDateFilter = true;
-        
+      transformedInvoices = transformedInvoices.filter(inv => {
+        const d = inv.date as Date;
+        if (!d) return false;
         if (dateFrom) {
-          const fromDate = new Date(dateFrom);
-          passesDateFilter = passesDateFilter && invoiceDate >= fromDate;
+          if (d < new Date(dateFrom)) return false;
         }
-        
         if (dateTo) {
-          const toDate = new Date(dateTo);
-          toDate.setHours(23, 59, 59, 999);
-          passesDateFilter = passesDateFilter && invoiceDate <= toDate;
+          const to = new Date(dateTo);
+            to.setHours(23,59,59,999);
+          if (d > to) return false;
         }
-        
-        return passesDateFilter;
+        return true;
       });
     }
 
-    // Apply amount filtering in JavaScript
     if (amountMin || amountMax) {
-      transformedInvoices = transformedInvoices.filter(invoice => {
-        const invoiceAmount = Number(invoice.amount);
-        if (isNaN(invoiceAmount)) return false;
-        
-        let passesAmountFilter = true;
-        
-        if (amountMin) {
-          const minAmount = parseFloat(amountMin);
-          passesAmountFilter = passesAmountFilter && invoiceAmount >= minAmount;
-        }
-        
-        if (amountMax) {
-          const maxAmount = parseFloat(amountMax);
-          passesAmountFilter = passesAmountFilter && invoiceAmount <= maxAmount;
-        }
-        
-        return passesAmountFilter;
+      transformedInvoices = transformedInvoices.filter(inv => {
+        const amt = Number(inv.amount) || 0;
+        if (amountMin && amt < parseFloat(amountMin)) return false;
+        if (amountMax && amt > parseFloat(amountMax)) return false;
+        return true;
       });
     }
 
-    // Apply pagination after filtering
-    const paginatedInvoices = transformedInvoices.slice(offset, offset + ITEMS_PER_PAGE);
-
-    return paginatedInvoices;
+    return transformedInvoices.slice(offset, offset + ITEMS_PER_PAGE);
   } catch (error) {
     console.error('Database Error:', error);
     throw new Error('Failed to fetch invoices.');
@@ -491,30 +398,50 @@ export async function fetchCategoryTotals() {
   console.log('Starting fetchCategoryTotals');
   try {
     const supabase = await createAdminClient();
-    
+
+    // Pull all needed numeric fields so we can validate Amount and fall back if missing
     const { data, error } = await supabase
       .from('INV1')
-      .select('Category, Amount');
+      .select('Category, Amount, Quantity, UnitPrice');
 
     if (error) throw error;
 
-    type CategoryTotal = { Category: string; TotalAmount: number };
+    type CategoryTotal = { Category: string; TotalAmount: number; lineCount: number };
 
-    const totals = (data ?? []).reduce<CategoryTotal[]>((acc, item) => {
-      const category = item.Category || 'Unknown';
-      const amount = item.Amount || 0;
-      console.log('Processing item:', { category, amount }); // Log each item processed
-      const existing = acc.find(i => i.Category === category);
+    const totalsMap = new Map<string, CategoryTotal>();
+
+    (data ?? []).forEach((item: any) => {
+      // Normalize category
+      let rawCategory: string | null = item.Category;
+      let category = (rawCategory && rawCategory.trim()) || 'Uncategorized';
+
+      // Prefer explicit Amount; if null/0 but we have Quantity & UnitPrice, derive
+      const qty = Number(item.Quantity) || 0;
+      const unit = Number(item.UnitPrice) || 0;
+      const derived = qty * unit; // before tax assumption
+      let amount = Number(item.Amount);
+      if (!amount || amount === 0) {
+        amount = derived; // fallback
+      }
+      if (!Number.isFinite(amount)) amount = 0;
+
+      const existing = totalsMap.get(category);
       if (existing) {
         existing.TotalAmount += amount;
+        existing.lineCount += 1;
       } else {
-        acc.push({ Category: category, TotalAmount: amount });
+        totalsMap.set(category, { Category: category, TotalAmount: amount, lineCount: 1 });
       }
-      return acc;
-    }, []);
+    });
 
-    
-    // Fallback if no data
+    // Convert to array & sort descending by amount for consistent chart ordering
+    const totals = Array.from(totalsMap.values())
+      .map(t => ({ Category: t.Category, TotalAmount: Number(t.TotalAmount.toFixed(2)) }))
+      .sort((a, b) => b.TotalAmount - a.TotalAmount);
+
+    // Debug summary
+    console.log('Category totals summary:', totals);
+
     return totals.length > 0 ? totals : [{ Category: 'No Data', TotalAmount: 0 }];
   } catch (error) {
     console.error('Database Error in fetchCategoryTotals:', error);
@@ -572,148 +499,148 @@ export async function fetchUsersWithUploads() {
   }
 }
 
+// Fetch top 10 users who uploaded the most invoices
+export async function fetchTopUploaders() {
+  try {
+    const supabase = await createAdminClient();
+    
+    // Get upload counts by username from PDF table
+    const { data: pdfCounts, error: pdfError } = await supabase
+      .from('pdf')
+      .select('uploader_username')
+      .not('uploader_username', 'is', null);
+
+    if (pdfError) throw pdfError;
+
+    // Count uploads per user
+    const uploadCounts = new Map<string, number>();
+    (pdfCounts || []).forEach(pdf => {
+      const username = pdf.uploader_username;
+      if (username) {
+        uploadCounts.set(username, (uploadCounts.get(username) || 0) + 1);
+      }
+    });
+
+    // Get user profiles for display names
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('username, full_name');
+
+    const profileMap = new Map();
+    (profiles || []).forEach(profile => {
+      if (profile.username) {
+        profileMap.set(profile.username, profile.full_name || profile.username);
+      }
+    });
+
+    // Convert to array and sort by upload count
+    const topUploaders = Array.from(uploadCounts.entries())
+      .map(([username, count]) => ({
+        username,
+        displayName: profileMap.get(username) || username,
+        uploadCount: count
+      }))
+      .sort((a, b) => b.uploadCount - a.uploadCount)
+      .slice(0, 10); // Top 10
+
+    return topUploaders;
+  } catch (error) {
+    console.error('Database Error in fetchTopUploaders:', error);
+    throw new Error('Failed to fetch top uploaders.');
+  }
+}
+
 // Fetch category totals for a specific user
 export async function fetchUserCategoryTotals(username: string) {
   try {
     const supabase = await createAdminClient();
     
     console.log(`Fetching category totals for user: ${username}`);
-    
-    // Get PDFs uploaded by this user
-    const { data: userPdfs, error: pdfError } = await supabase
+    // Step 1: PDFs uploaded by user
+    const { data: userPdfs, error: userPdfErr } = await supabase
       .from('pdf')
-      .select('pdf_url, oinv_uuid, uploader_username')
-      .eq('uploader_username', username);
-
-    if (pdfError) {
-      console.error('Error fetching user PDFs:', pdfError);
-      throw pdfError;
+      .select('pdf_filename, pdf_url')
+      .eq('uploader_username', username)
+      .limit(500);
+    if (userPdfErr) {
+      console.warn('Error fetching user PDFs:', userPdfErr.message);
     }
-
-    console.log(`Found ${userPdfs?.length || 0} PDFs for user ${username}`);
-
     if (!userPdfs || userPdfs.length === 0) {
+      console.log('User has no PDFs uploaded');
       return [{ Category: 'No Data', TotalAmount: 0 }];
     }
 
-    // Get invoice UUIDs from the PDFs (if linked)
-    const linkedInvoiceUuids = userPdfs
-      .filter(pdf => pdf.oinv_uuid)
-      .map(pdf => pdf.oinv_uuid);
+    const pdfFilenames = [...new Set(userPdfs.filter(p => p.pdf_filename).map(p => p.pdf_filename))];
+    const pdfUrls = [...new Set(userPdfs.filter(p => p.pdf_url).map(p => p.pdf_url))];
 
-    console.log(`Found ${linkedInvoiceUuids.length} linked invoices for user ${username}`);
+    // Step 2: Match invoices by filename/url (chunk queries to stay under limits)
+    let docNums: string[] = [];
+    const chunk = async (list: string[], size: number, field: 'pdf_filename' | 'pdf_url') => {
+      for (let i = 0; i < list.length; i += size) {
+        const sub = list.slice(i, i + size);
+        const { data: invChunk, error: invErr } = await supabase
+          .from('OINV')
+          .select('DocNum, ' + field)
+          .in(field, sub);
+        if (!invErr && invChunk) {
+          docNums.push(...(invChunk as any[]).map(i => (i as any).DocNum));
+        }
+      }
+    };
+    if (pdfFilenames.length) await chunk(pdfFilenames, 100, 'pdf_filename');
+    if (pdfUrls.length) await chunk(pdfUrls, 100, 'pdf_url');
+    docNums = [...new Set(docNums)];
 
-    // Get invoices for this user's uploads
-    let invoiceNumbers: string[] = [];
-    if (linkedInvoiceUuids.length > 0) {
-      const { data: invoices, error: invoiceError } = await supabase
-        .from('OINV')
-        .select('DocNum')
-        .in('uuid', linkedInvoiceUuids);
-
-      if (!invoiceError && invoices) {
-        invoiceNumbers = invoices.map(inv => inv.DocNum);
-        console.log(`Found invoice numbers:`, invoiceNumbers);
+    // Step 3: Optional username column linkage
+    if (docNums.length === 0) {
+      try {
+        const { data: invoicesByUsername, error: userInvErr } = await supabase
+          .from('OINV')
+          .select('DocNum, username')
+          .eq('username', username);
+        if (!userInvErr && invoicesByUsername) {
+          docNums = invoicesByUsername.map(i => i.DocNum);
+        }
+      } catch (e) {
+        console.warn('Username linkage failed (column may not exist).');
       }
     }
 
-    // If no linked invoices, create user-specific category assignments
-    // Based on actual uploaded content and user patterns
-    if (invoiceNumbers.length === 0) {
-      console.log(`No linked invoices found, creating user-specific categories for ${username}`);
-      
-      // Get all available categories from the system
-      const { data: allCategories, error: categoryError } = await supabase
-        .from('INV1')
-        .select('Category, Amount')
-        .not('Category', 'is', null)
-        .limit(50);
-
-      if (categoryError) {
-        console.error('Error fetching categories:', categoryError);
-        throw categoryError;
-      }
-
-      // Group categories and calculate totals
-      const categoryTotals = (allCategories || []).reduce((acc, item) => {
-        const cat = item.Category;
-        acc[cat] = (acc[cat] || 0) + (item.Amount || 0);
-        return acc;
-      }, {} as Record<string, number>);
-
-      console.log('Available category totals:', categoryTotals);
-
-      // Create user-specific category assignments based on their uploads and user patterns
-      // This simulates what would happen when PDFs are properly linked to invoices
-      const uploadCount = userPdfs.length;
-      let userSpecificCategories: { Category: string; TotalAmount: number }[] = [];
-
-      if (username === 'jungkook09') {
-        // Jungkook uploaded electronics invoices
-        userSpecificCategories = [
-          { Category: 'Electronics', TotalAmount: Math.round(categoryTotals['Electronics'] * 0.3) || 32549 },
-          { Category: 'Office Supplies', TotalAmount: 15000 } // Secondary category for variety
-        ];
-      } else if (username === 'gracelyn') {
-        // Gracelyn uploaded different category invoices
-        userSpecificCategories = [
-          { Category: 'Food & Beverages', TotalAmount: Math.round(categoryTotals['Food & Beverages'] * 0.6) || 8899 },
-          { Category: 'Home & Living', TotalAmount: Math.round(categoryTotals['Home & Living'] * 0.8) || 2385 }
-        ];
-      } else if (username === 'cwhui_1001') {
-        // Another user with different patterns
-        userSpecificCategories = [
-          { Category: 'Electronics', TotalAmount: Math.round(categoryTotals['Electronics'] * 0.2) || 21699 },
-          { Category: 'Food & Beverages', TotalAmount: Math.round(categoryTotals['Food & Beverages'] * 0.4) || 5933 }
-        ];
-      } else {
-        // Default for other users - distribute available categories based on upload count
-        const availableCategories = Object.keys(categoryTotals);
-        const selectedCategories = availableCategories.slice(0, Math.min(uploadCount, 3));
-        
-        userSpecificCategories = selectedCategories.map((category, index) => ({
-          Category: category,
-          TotalAmount: Math.round(categoryTotals[category] * (0.2 + index * 0.1))
-        }));
-      }
-
-      console.log(`User-specific categories for ${username}:`, userSpecificCategories);
-      
-      return userSpecificCategories.length > 0 ? userSpecificCategories : [{ Category: 'No Data', TotalAmount: 0 }];
+    if (!docNums.length) {
+      console.log('No invoices matched uploaded PDFs or username');
+      return [{ Category: 'No Data', TotalAmount: 0 }];
     }
+    console.log(`Found ${docNums.length} invoices for user ${username}`);
 
-    // Get category data for linked invoices
-    const { data: categoryData, error: categoryError } = await supabase
+    // Step 4: Fetch line items
+    const { data: lineItems, error: lineErr } = await supabase
       .from('INV1')
-      .select('Category, Amount')
-      .in('InvoiceDocNum', invoiceNumbers);
-
-    if (categoryError) {
-      console.error('Error fetching category data:', categoryError);
-      throw categoryError;
+      .select('Category, Amount, Quantity, UnitPrice, DocNum')
+      .in('DocNum', docNums);
+    if (lineErr) throw lineErr;
+    if (!lineItems || !lineItems.length) {
+      return [{ Category: 'No Data', TotalAmount: 0 }];
     }
 
-    console.log(`Found category data:`, categoryData);
+    // Step 5: Aggregate
+    const totalsMap = new Map<string, number>();
+    lineItems.forEach((li: any) => {
+      const category = (li.Category && li.Category.trim()) || 'Uncategorized';
+      const qty = Number(li.Quantity) || 0;
+      const unit = Number(li.UnitPrice) || 0;
+      let amount = Number(li.Amount) || 0;
+      if (!amount || amount === 0) amount = qty * unit;
+      if (!Number.isFinite(amount)) amount = 0;
+      totalsMap.set(category, (totalsMap.get(category) || 0) + amount);
+    });
 
-    type CategoryTotal = { Category: string; TotalAmount: number };
+    const totals = Array.from(totalsMap.entries())
+      .map(([Category, TotalAmount]) => ({ Category, TotalAmount: Number(TotalAmount.toFixed(2)) }))
+      .sort((a, b) => b.TotalAmount - a.TotalAmount);
 
-    const totals = (categoryData ?? []).reduce<CategoryTotal[]>((acc, item) => {
-      const category = item.Category || 'Unknown';
-      const amount = item.Amount || 0;
-      const existing = acc.find(i => i.Category === category);
-      if (existing) {
-        existing.TotalAmount += amount;
-      } else {
-        acc.push({ Category: category, TotalAmount: amount });
-      }
-      return acc;
-    }, []);
-
-    console.log(`Final category totals:`, totals);
-
-    return totals.length > 0 ? totals : [{ Category: 'No Data', TotalAmount: 0 }];
+    return totals.length ? totals : [{ Category: 'No Data', TotalAmount: 0 }];
   } catch (error) {
-    console.error('Database Error in fetchUserCategoryTotals:', error);
-    throw new Error('Failed to fetch user category totals.');
+    console.error('Database Error in fetchUserCategoryTotals (outer catch):', error);
+    return [{ Category: 'No Data', TotalAmount: 0 }];
   }
 }

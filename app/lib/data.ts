@@ -9,6 +9,7 @@ import {
   fetchCategoryTotals,
   fetchUsersWithUploads,
   fetchUserCategoryTotals,
+  fetchTopUploaders,
 } from './data-supabase';
 
 // Constants
@@ -26,6 +27,7 @@ export {
   fetchCategoryTotals,
   fetchUsersWithUploads,
   fetchUserCategoryTotals,
+  fetchTopUploaders,
 };
 
 // Export updateInvoiceStatus function (assuming it's used)

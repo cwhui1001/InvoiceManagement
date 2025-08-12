@@ -72,7 +72,18 @@ export async function POST(request: Request) {
             upsert: false, // Don't overwrite existing files
             cacheControl: '3600'
           });
-console.error('Storage Error:', storageData);
+        if (storageError) {
+          console.error('Storage upload failed:', {
+            message: storageError.message,
+            name: storageError.name,
+            status: (storageError as any)?.status,
+            file: filename,
+            size: file.size,
+            type: file.type,
+          });
+        } else {
+          console.log('Storage upload success:', storageData?.path || filename);
+        }
 
         if (storageError) {
           throw new Error(`Storage error: ${storageError.message}`);
@@ -90,7 +101,6 @@ console.error('Storage Error:', storageData);
           .insert({
             pdf_url: publicUrl,
             pdf_filename: filename, // Keep original timestamp-filename format
-            oinv_uuid: null, // No invoice link initially
             uploader_user_id: user.id, // Store actual uploader's user ID
             uploader_username: uploaderUsername, // Store username for display
             created_by: user.id // Audit trail
@@ -99,6 +109,7 @@ console.error('Storage Error:', storageData);
           .single();
 
         if (dbError) {
+          console.error('Failed inserting pdf record:', dbError.message, dbError);
           throw new Error(`Database error: ${dbError.message}`);
         }
 
@@ -177,7 +188,7 @@ console.error('Storage Error:', storageData);
           pdfId: pdfRecord.id,
           pdfUuid: pdfRecord.pdf_uuid,
           executionId: executionId, // Include execution ID for progress tracking
-          invoiceNumber: null, // No invoice linked initially
+          invoiceNumber: null, // Not linked yet
           invoiceStatus: null
         });
 
