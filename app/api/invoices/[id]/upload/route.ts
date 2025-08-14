@@ -63,12 +63,11 @@ export async function POST(
       .from('invoices')
       .getPublicUrl(`${invoiceId}/${file.name}`);
 
-    // Update invoice record with file URL, filename, and user ID
+    // Update invoice record with file URL and user ID
     const { data: updateData, error: updateError } = await (await supabase)
       .from('OINV')
       .update({
         pdf_url: publicUrl,
-        pdf_filename: file.name,
         uuid: userId, // Add the authenticated user's ID
       })
       .eq('DocNum', invoiceId);

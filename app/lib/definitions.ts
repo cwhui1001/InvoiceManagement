@@ -114,9 +114,8 @@ export type OINV = {
   TotalwithGST: number;
   Status?: string | null;
   pdf_url?: string | null;
-  pdf_filename?: string | null;
   created_at?: Date | string | null;
-  username?: string;
+  uuid?: string;
 };
 
 export type INV1 = {
@@ -129,6 +128,7 @@ export type INV1 = {
   Tax: string;
   Category: string | null;
   Amount: number | null;
+  Discount: number | null;
 };
 
 // Updated LatestInvoiceRaw to match your OINV schema

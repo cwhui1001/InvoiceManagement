@@ -1,8 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { TrashIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { deleteInvoice, updateInvoiceStatus } from '@/app/lib/actions';
+import { deleteInvoice, updateBulkInvoiceStatus } from '@/app/lib/actions';
 
 interface BulkActionsProps {
   selectedInvoices: string[];
@@ -15,6 +16,7 @@ export default function BulkActions({
   onDeselectAll, 
   onActionComplete 
 }: BulkActionsProps) {
+  const router = useRouter();
   const [isProcessing, setIsProcessing] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
@@ -27,24 +29,28 @@ export default function BulkActions({
       );
       onDeselectAll();
       onActionComplete();
+      // Force a router refresh to ensure the UI updates
+      router.refresh();
     } catch (error) {
       console.error('Error deleting invoices:', error);
+      alert('Error deleting invoices. Please try again.');
     } finally {
       setIsProcessing(false);
       setShowDeleteConfirm(false);
     }
   };
 
-  const handleBulkStatusUpdate = async (status: 'pending' | 'paid') => {
+  const handleBulkStatusUpdate = async (status: 'pending' | 'done') => {
     setIsProcessing(true);
     try {
-      await Promise.all(
-        selectedInvoices.map(id => updateInvoiceStatus(id, status))
-      );
+      await updateBulkInvoiceStatus(selectedInvoices, status);
       onDeselectAll();
       onActionComplete();
+      // Force a router refresh to ensure the UI updates
+      router.refresh();
     } catch (error) {
       console.error('Error updating invoice status:', error);
+      alert('Error updating invoice status. Please try again.');
     } finally {
       setIsProcessing(false);
       setShowStatusMenu(false);
@@ -83,11 +89,11 @@ export default function BulkActions({
                     Set Pending
                   </button>
                   <button
-                    onClick={() => handleBulkStatusUpdate('paid')}
+                    onClick={() => handleBulkStatusUpdate('done')}
                     disabled={isProcessing}
                     className="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 disabled:opacity-50"
                   >
-                    Set Paid
+                    Set Done
                   </button>
                 </div>
               )}

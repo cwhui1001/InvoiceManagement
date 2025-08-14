@@ -20,25 +20,31 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
   const supabase = createClient();
   const [categories, setCategories] = useState<string[]>([]);
   
+  // Store the original DocNum to handle DocNum changes
+  const originalDocNum = invoiceData.header.DocNum;
+  
   // Debug: Log the invoice data to see what we're receiving
   console.log('Invoice Data:', invoiceData);
   console.log('Line Items:', invoiceData.lineItems);
   
   const [formData, setFormData] = useState({
     header: invoiceData.header,
-    lineItems: invoiceData.lineItems && invoiceData.lineItems.length > 0 ? invoiceData.lineItems : [
-      {
-        DocNum: invoiceData.header.DocNum,
-        No: 1,
-        ItemCode: '',
-        Description: '',
-        Quantity: 1,
-        UnitPrice: 0,
-        Tax: '',
-        Category: '', // Initialize as empty, will be set after fetching categories
-        Amount: 0,
-      }
-    ]
+    lineItems: invoiceData.lineItems && invoiceData.lineItems.length > 0 
+      ? invoiceData.lineItems
+      : [
+        {
+          DocNum: invoiceData.header.DocNum,
+          No: 1,
+          ItemCode: '',
+          Description: '',
+          Quantity: 1,
+          UnitPrice: 0,
+          Tax: '',
+          Category: '', // Initialize as empty, will be set after fetching categories
+          Amount: 0,
+          Discount: null,
+        } as INV1
+      ]
   });
 
   // Fetch unique categories from INV1 table
@@ -76,13 +82,25 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
   }, []);
 
   const handleHeaderChange = (field: keyof OINV, value: string | number | Date) => {
-    setFormData(prev => ({
-      ...prev,
-      header: {
-        ...prev.header,
-        [field]: value
+    setFormData(prev => {
+      const newFormData = {
+        ...prev,
+        header: {
+          ...prev.header,
+          [field]: value
+        }
+      };
+      
+      // If DocNum changes, update all line items to use the new DocNum
+      if (field === 'DocNum' && typeof value === 'string') {
+        newFormData.lineItems = prev.lineItems.map(item => ({
+          ...item,
+          DocNum: value
+        }));
       }
-    }));
+      
+      return newFormData;
+    });
   };
 
   const handleLineItemChange = (index: number, field: keyof INV1, value: string | number) => {
@@ -92,11 +110,13 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
       [field]: value
     };
     
-    // Recalculate amount if quantity or unit price changes
-    if (field === 'Quantity' || field === 'UnitPrice') {
+    // Recalculate amount if quantity, unit price, or discount changes
+    if (field === 'Quantity' || field === 'UnitPrice' || field === 'Discount') {
       const quantity = field === 'Quantity' ? Number(value) : newLineItems[index].Quantity;
       const unitPrice = field === 'UnitPrice' ? Number(value) : newLineItems[index].UnitPrice;
-      newLineItems[index].Amount = (quantity || 0) * (unitPrice || 0);
+      const discount = field === 'Discount' ? Number(value) : (newLineItems[index].Discount || 0);
+      const subtotal = (quantity || 0) * (unitPrice || 0);
+      newLineItems[index].Amount = subtotal - (discount || 0);
     }
     
     setFormData(prev => ({
@@ -119,6 +139,7 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
       Tax: '',
       Category: categories.length > 0 ? categories[0] : '', // Default to first category if available
       Amount: 0,
+      Discount: null,
     };
     
     setFormData(prev => ({
@@ -158,11 +179,19 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate DocNum
+    if (!formData.header.DocNum || formData.header.DocNum.trim() === '') {
+      alert('Document Number is required');
+      return;
+    }
+    
     try {
-      await updateInvoice(formData.header.DocNum, formData);
+      await updateInvoice(originalDocNum, formData);
       // Redirect or show success message
     } catch (error) {
       console.error('Error updating invoice:', error);
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred while updating the invoice';
+      alert(errorMessage);
     }
   };
 
@@ -180,20 +209,27 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
             <div>
               <label htmlFor="docNum" className="block text-sm font-medium text-gray-700 mb-2">
                 Document Number
+                {formData.header.DocNum !== originalDocNum && (
+                  <span className="ml-2 text-xs text-amber-600 font-normal">
+                    (Changed from: {originalDocNum})
+                  </span>
+                )}
               </label>
-              <div className="relative">
+              
                 <input
                   id="docNum"
                   name="docNum"
                   type="text"
                   value={formData.header.DocNum}
-                  readOnly
-                  className="block w-full rounded-md border border-gray-300 py-2 px-3 text-sm bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  onChange={(e) => handleHeaderChange('DocNum', e.target.value)}
+                  className={`block w-full rounded-md border py-2 px-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+                    formData.header.DocNum !== originalDocNum 
+                      ? 'border-amber-300 bg-amber-50' 
+                      : 'border-gray-300 bg-white'
+                  }`}
+                  placeholder="Enter document number..."
                 />
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3">
-                  <span className="text-xs text-gray-500">Read-only</span>
-                </div>
-              </div>
+                
             </div>
 
             {/* Customer Code */}
@@ -366,7 +402,7 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-8 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Item Code
@@ -431,6 +467,24 @@ export default function EditInvoiceForm({ invoiceData, customers }: EditInvoiceF
                         step="0.01"
                         value={item.UnitPrice || ''}
                         onChange={(e) => handleLineItemChange(index, 'UnitPrice', parseFloat(e.target.value) || 0)}
+                        className="block w-full rounded-md border border-gray-300 py-2 pl-8 pr-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        min="0"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Discount
+                    </label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2 text-gray-500">$</span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={item.Discount || ''}
+                        onChange={(e) => handleLineItemChange(index, 'Discount', parseFloat(e.target.value) || 0)}
                         className="block w-full rounded-md border border-gray-300 py-2 pl-8 pr-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                         min="0"
                         placeholder="0.00"
